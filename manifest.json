@@ -1,0 +1,43 @@
+{
+  "name": "3D Tic-Tac-Toe - Cube Battle",
+  "short_name": "3D TicTacToe",
+  "description": "Play Tic-Tac-Toe in 3D! Battle in a cube against AI, local friends, or online players.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#6c5ce7",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Play vs AI",
+      "short_name": "vs AI",
+      "description": "Start a game against the computer",
+      "url": "/?mode=ai"
+    },
+    {
+      "name": "Local Multiplayer",
+      "short_name": "2 Players",
+      "description": "Play with a friend locally",
+      "url": "/?mode=local"
+    }
+  ]
+}
