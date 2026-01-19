@@ -633,6 +633,19 @@
         let gameMode = 'ai'; // 'ai', 'local', 'online'
         let currentPlayer = 'X';
         let gameBoard = new Array(27).fill(null);
+
+        // Helper function to ensure gameBoard is always an array
+        function ensureGameBoardArray() {
+            if (!Array.isArray(gameBoard)) {
+                const boardData = gameBoard || {};
+                gameBoard = Object.keys(boardData).length > 0 
+                    ? Array.from({length: 27}, (_, i) => boardData[i] !== undefined ? boardData[i] : null)
+                    : new Array(27).fill(null);
+            }
+            // Ensure exactly 27 elements
+            while (gameBoard.length < 27) gameBoard.push(null);
+            return gameBoard;
+        }
         let scores = { X: 0, O: 0 };
         let roundsPlayed = 0;
         let maxRounds = 5;
@@ -813,6 +826,7 @@
                 const cell = intersects[0].object;
                 const index = cell.userData.index;
 
+                ensureGameBoardArray(); // Ensure gameBoard is an array
                 if (gameBoard[index] === null) {
                     makeMove(index);
                 }
@@ -820,6 +834,7 @@
         }
 
         function makeMove(index) {
+            ensureGameBoardArray(); // Ensure gameBoard is an array
             if (gameBoard[index] !== null) return;
 
             gameBoard[index] = currentPlayer;
@@ -1415,6 +1430,7 @@
                 const cell = intersects[0].object;
                 const index = cell.userData.index;
 
+                ensureGameBoardArray(); // Ensure gameBoard is an array
                 if (gameBoard[index] === null) {
                     makeMove(index);
                 }
