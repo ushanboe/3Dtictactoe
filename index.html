@@ -670,6 +670,7 @@
         let raycaster, mouse;
         let autoRotate = true;
         let isDragging = false;
+        let hoveredCell = null; // Track hovered cell for visual feedback
         let previousMousePosition = { x: 0, y: 0 };
         let mouseStartPosition = { x: 0, y: 0 };
 
@@ -779,8 +780,8 @@
                         const material = new THREE.MeshPhongMaterial({
                             color: 0x334455,
                             transparent: true,
-                            opacity: 0.3,
-                            side: THREE.DoubleSide
+                            opacity: 0.6,
+                            side: THREE.FrontSide  // Only render front faces
                         });
 
                         const cell = new THREE.Mesh(geometry, material);
@@ -1384,6 +1385,37 @@
         }
 
         function onMouseMove(e) {
+            // Update hover effect
+            if (e.buttons === 0 && gameActive) {
+                const canvas = renderer.domElement;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                mouse.x = (x / rect.width) * 2 - 1;
+                mouse.y = -(y / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                cubeGroup.updateMatrixWorld(true);
+                const intersects = raycaster.intersectObjects(cells, false);
+
+                // Reset previous hover
+                if (hoveredCell && hoveredCell.material) {
+                    if (gameBoard[hoveredCell.userData.index] === null) {
+                        hoveredCell.material.emissive.setHex(0x000000);
+                    }
+                }
+
+                // Set new hover
+                if (intersects.length > 0) {
+                    const cell = intersects[0].object;
+                    if (gameBoard[cell.userData.index] === null) {
+                        cell.material.emissive.setHex(0x222244);
+                        hoveredCell = cell;
+                    }
+                } else {
+                    hoveredCell = null;
+                }
+            }
+
             if (e.buttons !== 1) return;
 
             const deltaX = e.clientX - previousMousePosition.x;
