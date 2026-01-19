@@ -1309,10 +1309,14 @@
             setTimeout(() => isDragging = false, 100);
         }
 
+        let touchStartPos = { x: 0, y: 0 };
+        let touchMoved = false;
+
         function onTouchStart(e) {
             e.preventDefault();
-            isDragging = false;
+            touchMoved = false;
             if (e.touches.length === 1) {
+                touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }
         }
@@ -1323,8 +1327,12 @@
                 const deltaX = e.touches[0].clientX - previousMousePosition.x;
                 const deltaY = e.touches[0].clientY - previousMousePosition.y;
 
-                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-                    isDragging = true;
+                const totalDeltaX = e.touches[0].clientX - touchStartPos.x;
+                const totalDeltaY = e.touches[0].clientY - touchStartPos.y;
+
+                // Only count as drag if moved more than 10 pixels total
+                if (Math.abs(totalDeltaX) > 10 || Math.abs(totalDeltaY) > 10) {
+                    touchMoved = true;
                     cubeGroup.rotation.y += deltaX * 0.01;
                     cubeGroup.rotation.x += deltaY * 0.01;
                 }
@@ -1334,11 +1342,36 @@
         }
 
         function onTouchEnd(e) {
-            if (!isDragging && e.changedTouches.length === 1) {
+            e.preventDefault();
+            if (!touchMoved && e.changedTouches.length === 1) {
                 const touch = e.changedTouches[0];
-                onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+                // Simulate click for cell selection
+                handleTouchClick(touch.clientX, touch.clientY);
             }
-            setTimeout(() => isDragging = false, 100);
+            touchMoved = false;
+        }
+
+        function handleTouchClick(clientX, clientY) {
+            if (!gameActive) return;
+            if (gameMode === 'online' && !isMyTurn) return;
+
+            const canvas = renderer.domElement;
+            const rect = canvas.getBoundingClientRect();
+
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cells);
+
+            if (intersects.length > 0) {
+                const cell = intersects[0].object;
+                const index = cell.userData.index;
+
+                if (gameBoard[index] === null) {
+                    makeMove(index);
+                }
+            }
         }
 
         function onWindowResize() {
