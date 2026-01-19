@@ -772,6 +772,7 @@
         }
 
         function onCanvasClick(event) {
+            console.log('Click detected - isDragging:', isDragging, 'gameActive:', gameActive, 'gameMode:', gameMode, 'isMyTurn:', isMyTurn, 'mySymbol:', mySymbol);
             if (isDragging) return;
             if (!gameActive) return;
             if (gameMode === 'online' && !isMyTurn) return;
@@ -1120,6 +1121,7 @@
                 // Listen for game updates
                 roomRef.on('value', (snapshot) => {
                     const data = snapshot.val();
+                    console.log('Player 2 Firebase update:', data);
                     if (!data) {
                         alert('Game ended');
                         backToMenu();
@@ -1129,6 +1131,7 @@
                     gameBoard = data.board || Array(27).fill(null);
                     currentPlayer = data.currentPlayer;
                     isMyTurn = currentPlayer === mySymbol;
+                    console.log('Player 2 - currentPlayer:', currentPlayer, 'mySymbol:', mySymbol, 'isMyTurn:', isMyTurn, 'gameActive:', gameActive, 'cells.length:', cells.length);
                     if (cells.length === 27) {
                         syncBoardVisuals();
                     }
@@ -1356,6 +1359,7 @@
         }
 
         function handleTouchClick(clientX, clientY) {
+            console.log('Touch click - gameActive:', gameActive, 'gameMode:', gameMode, 'isMyTurn:', isMyTurn, 'mySymbol:', mySymbol);
             if (!gameActive) return;
             if (gameMode === 'online' && !isMyTurn) return;
 
