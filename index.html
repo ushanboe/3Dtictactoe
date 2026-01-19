@@ -839,9 +839,17 @@
             console.log('Intersects count:', intersects.length);
 
             if (intersects.length > 0) {
+                // Log all intersections for debugging
+                console.log('=== CLICK DEBUG ===' );
+                console.log('Total intersections:', intersects.length);
+                intersects.forEach((hit, i) => {
+                    const c = hit.object;
+                    console.log(`  [${i}] cell index: ${c.userData.index}, xyz: (${c.userData.x},${c.userData.y},${c.userData.z}), distance: ${hit.distance.toFixed(2)}`);
+                });
+
                 const cell = intersects[0].object;
                 const index = cell.userData.index;
-                console.log('Hit cell index:', index, 'userData:', cell.userData, 'position:', cell.position);
+                console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
 
                 ensureGameBoardArray(); // Ensure gameBoard is an array
                 if (gameBoard[index] === null) {
@@ -1503,9 +1511,17 @@
             console.log('Intersects count:', intersects.length);
 
             if (intersects.length > 0) {
+                // Log all intersections for debugging
+                console.log('=== CLICK DEBUG ===' );
+                console.log('Total intersections:', intersects.length);
+                intersects.forEach((hit, i) => {
+                    const c = hit.object;
+                    console.log(`  [${i}] cell index: ${c.userData.index}, xyz: (${c.userData.x},${c.userData.y},${c.userData.z}), distance: ${hit.distance.toFixed(2)}`);
+                });
+
                 const cell = intersects[0].object;
                 const index = cell.userData.index;
-                console.log('Hit cell index:', index, 'userData:', cell.userData, 'position:', cell.position);
+                console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
 
                 ensureGameBoardArray(); // Ensure gameBoard is an array
                 if (gameBoard[index] === null) {
