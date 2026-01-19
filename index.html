@@ -792,8 +792,10 @@
                     for (let x = 0; x < 3; x++) {
                         // Use thin flat boxes for cells (like tiles)
                         const geometry = new THREE.BoxGeometry(cellSize, 0.15, cellSize);
+                        // Color-code layers: bottom=red, middle=green, top=blue
+                        const layerColors = [0x664444, 0x446644, 0x444466];  // red, green, blue tints
                         const material = new THREE.MeshPhongMaterial({
-                            color: 0x445566,
+                            color: layerColors[y],
                             transparent: true,
                             opacity: 0.8,
                             side: THREE.DoubleSide
@@ -1648,7 +1650,7 @@
             requestAnimationFrame(animate);
 
             if (autoRotate && !isDragging) {
-                cubeGroup.rotation.y += 0.003;
+                // cubeGroup.rotation.y += 0.003;  // Disabled for debugging
             }
 
             renderer.render(scene, camera);
