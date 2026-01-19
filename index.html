@@ -820,15 +820,23 @@
             const canvas = renderer.domElement;
             const rect = canvas.getBoundingClientRect();
 
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            // Use rect dimensions for proper coordinate mapping
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            mouse.x = (x / rect.width) * 2 - 1;
+            mouse.y = -(y / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(cells);
 
+            console.log('Mouse normalized:', mouse.x, mouse.y);
+            console.log('Intersects count:', intersects.length);
+
             if (intersects.length > 0) {
                 const cell = intersects[0].object;
                 const index = cell.userData.index;
+                console.log('Hit cell index:', index, 'userData:', cell.userData, 'position:', cell.position);
 
                 ensureGameBoardArray(); // Ensure gameBoard is an array
                 if (gameBoard[index] === null) {
@@ -1214,6 +1222,11 @@
 
             if (!scene) initThreeJS();
 
+            // Ensure renderer size matches canvas after layout is complete
+            setTimeout(() => {
+                onWindowResize();
+            }, 100);
+
             // For online mode, don't reset board - sync from Firebase instead
             if (gameMode === 'online') {
                 gameActive = true;
@@ -1294,6 +1307,11 @@
             document.getElementById('gameContainer').style.display = 'flex';
 
             if (!scene) initThreeJS();
+
+            // Ensure renderer size matches canvas after layout is complete
+            setTimeout(() => {
+                onWindowResize();
+            }, 100);
 
             resetMatch();
         }
@@ -1428,15 +1446,23 @@
             const canvas = renderer.domElement;
             const rect = canvas.getBoundingClientRect();
 
-            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            // Use rect dimensions for proper coordinate mapping
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            mouse.x = (x / rect.width) * 2 - 1;
+            mouse.y = -(y / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(cells);
 
+            console.log('Mouse normalized:', mouse.x, mouse.y);
+            console.log('Intersects count:', intersects.length);
+
             if (intersects.length > 0) {
                 const cell = intersects[0].object;
                 const index = cell.userData.index;
+                console.log('Hit cell index:', index, 'userData:', cell.userData, 'position:', cell.position);
 
                 ensureGameBoardArray(); // Ensure gameBoard is an array
                 if (gameBoard[index] === null) {
