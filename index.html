@@ -6,6 +6,10 @@
     <title>3D Tic-Tac-Toe | Play Online</title>
     <meta name="description" content="Play 3D Tic-Tac-Toe online with friends or against AI">
     <meta name="theme-color" content="#667eea">
+    <!-- Version: 1768796028 - Force cache refresh -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -855,7 +859,11 @@
             } else if (Array.isArray(gameBoard) && gameBoard.every(cell => cell !== null)) {
                 handleDraw();
             } else {
-                switchPlayer();
+                // For online mode, Firebase listener handles turn switching
+                // Only switch locally for non-online modes
+                if (gameMode !== 'online') {
+                    switchPlayer();
+                }
 
                 if (gameMode === 'ai' && currentPlayer === 'O') {
                     setTimeout(aiMove, 500);
