@@ -258,6 +258,21 @@
         }
 
         .hidden { display: none !important; }
+
+        .player-names {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .name-input {
+            flex: 1;
+            text-align: center;
+            text-transform: none;
+            letter-spacing: normal;
+            font-size: 0.9rem;
+            font-weight: normal;
+        }
     </style>
 </head>
 <body>
@@ -269,6 +284,10 @@
         <div class="menu-card">
             <div class="menu-section">
                 <h3>Play Local</h3>
+                <div class="player-names">
+                    <input type="text" id="player1Name" class="input-field name-input" placeholder="Player 1 name" maxlength="12">
+                    <input type="text" id="player2Name" class="input-field name-input" placeholder="Player 2 name" maxlength="12">
+                </div>
                 <button class="btn btn-primary" onclick="startLocalGame()">Two Players</button>
                 <button class="btn btn-secondary" onclick="startAIGame()">vs Computer</button>
             </div>
@@ -327,6 +346,25 @@
         </div>
     </div>
 
+    <!-- Rematch Request Modal -->
+    <div id="rematchModal" class="modal">
+        <div class="modal-content">
+            <h2>🎮 Rematch Request!</h2>
+            <p id="rematchMessage">Opponent wants to play again!</p>
+            <button class="btn btn-primary" onclick="acceptRematch()">Accept</button>
+            <button class="btn btn-secondary" onclick="declineRematch()">Decline</button>
+        </div>
+    </div>
+
+    <!-- Waiting for Rematch Modal -->
+    <div id="waitingRematchModal" class="modal">
+        <div class="modal-content">
+            <h2>⏳ Waiting...</h2>
+            <p>Waiting for opponent to accept rematch...</p>
+            <button class="btn btn-secondary" onclick="cancelRematch()">Cancel</button>
+        </div>
+    </div>
+
     <script>
         // ============================================
         // FIREBASE CONFIGURATION
@@ -362,6 +400,9 @@
         let gameCode = null;
         let gameRef = null;
         let isMyTurn = true;
+        let player1Name = 'Player 1';
+        let player2Name = 'Player 2';
+        let rematchRequested = false;
 
         // ============================================
         // THREE.JS VARIABLES
@@ -741,28 +782,98 @@
         }
 
         function createX() {
+            // Crossed sausages! 🌭
             const group = new THREE.Group();
-            const material = new THREE.MeshPhongMaterial({ color: 0xff6b6b });
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0xff6b6b,
+                shininess: 80
+            });
 
-            const barGeom = new THREE.BoxGeometry(0.6, 0.1, 0.1);
+            // Sausage shape: cylinder with rounded ends (capsule-like)
+            const sausageRadius = 0.06;
+            const sausageLength = 0.5;
+            const sausageGeom = new THREE.CylinderGeometry(sausageRadius, sausageRadius, sausageLength, 16);
 
-            const bar1 = new THREE.Mesh(barGeom, material);
-            bar1.rotation.y = Math.PI / 4;
-            group.add(bar1);
+            // Add rounded end caps
+            const capGeom = new THREE.SphereGeometry(sausageRadius, 16, 8);
 
-            const bar2 = new THREE.Mesh(barGeom, material);
-            bar2.rotation.y = -Math.PI / 4;
-            group.add(bar2);
+            // First sausage
+            const sausage1 = new THREE.Group();
+            const cyl1 = new THREE.Mesh(sausageGeom, material);
+            cyl1.rotation.z = Math.PI / 2;
+            sausage1.add(cyl1);
+            const cap1a = new THREE.Mesh(capGeom, material);
+            cap1a.position.x = sausageLength / 2;
+            sausage1.add(cap1a);
+            const cap1b = new THREE.Mesh(capGeom, material);
+            cap1b.position.x = -sausageLength / 2;
+            sausage1.add(cap1b);
+            sausage1.rotation.y = Math.PI / 4;
+            group.add(sausage1);
+
+            // Second sausage
+            const sausage2 = new THREE.Group();
+            const cyl2 = new THREE.Mesh(sausageGeom, material);
+            cyl2.rotation.z = Math.PI / 2;
+            sausage2.add(cyl2);
+            const cap2a = new THREE.Mesh(capGeom, material);
+            cap2a.position.x = sausageLength / 2;
+            sausage2.add(cap2a);
+            const cap2b = new THREE.Mesh(capGeom, material);
+            cap2b.position.x = -sausageLength / 2;
+            sausage2.add(cap2b);
+            sausage2.rotation.y = -Math.PI / 4;
+            group.add(sausage2);
 
             return group;
         }
 
         function createO() {
-            const geometry = new THREE.TorusGeometry(0.25, 0.05, 16, 32);
-            const material = new THREE.MeshPhongMaterial({ color: 0x4ecdc4 });
-            const torus = new THREE.Mesh(geometry, material);
-            torus.rotation.x = Math.PI / 2;
-            return torus;
+            // Delicious doughnut! 🍩
+            const group = new THREE.Group();
+
+            // Main doughnut body
+            const torusGeom = new THREE.TorusGeometry(0.22, 0.09, 24, 48);
+            const doughnutMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xd4a574,  // Golden brown doughnut color
+                shininess: 30
+            });
+            const doughnut = new THREE.Mesh(torusGeom, doughnutMaterial);
+            doughnut.rotation.x = Math.PI / 2;
+            group.add(doughnut);
+
+            // Pink frosting on top
+            const frostingGeom = new THREE.TorusGeometry(0.22, 0.07, 24, 48, Math.PI);
+            const frostingMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xff69b4,  // Hot pink frosting
+                shininess: 60
+            });
+            const frosting = new THREE.Mesh(frostingGeom, frostingMaterial);
+            frosting.rotation.x = Math.PI / 2;
+            frosting.rotation.z = Math.PI;
+            frosting.position.y = 0.03;
+            group.add(frosting);
+
+            // Sprinkles!
+            const sprinkleColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+            for (let i = 0; i < 12; i++) {
+                const sprinkleGeom = new THREE.CylinderGeometry(0.01, 0.01, 0.04, 6);
+                const sprinkleMat = new THREE.MeshPhongMaterial({ 
+                    color: sprinkleColors[i % sprinkleColors.length]
+                });
+                const sprinkle = new THREE.Mesh(sprinkleGeom, sprinkleMat);
+
+                const angle = (i / 12) * Math.PI * 2;
+                const radius = 0.18 + Math.random() * 0.08;
+                sprinkle.position.x = Math.cos(angle) * radius;
+                sprinkle.position.z = Math.sin(angle) * radius;
+                sprinkle.position.y = 0.08;
+                sprinkle.rotation.x = Math.random() * 0.5;
+                sprinkle.rotation.z = Math.random() * Math.PI;
+                group.add(sprinkle);
+            }
+
+            return group;
         }
 
         function checkWinner() {
@@ -840,7 +951,10 @@
                 player1: true,
                 player2: false,
                 status: 'waiting',
-                winner: ''
+                winner: '',
+                rematchRequest: '',
+                rematchAccepted: false,
+                rematchDeclined: ''
             });
 
             // Show waiting modal
@@ -926,6 +1040,22 @@
                         showWinModal('draw');
                     }
                 }
+
+                // Handle rematch system
+                if (data.rematchAccepted) {
+                    // Other player accepted, reset game
+                    document.getElementById('waitingRematchModal').classList.remove('show');
+                    resetGame();
+                } else if (data.rematchRequest && data.rematchRequest !== playerSymbol && !rematchRequested) {
+                    // Other player requested rematch, show popup
+                    document.getElementById('winModal').classList.remove('show');
+                    document.getElementById('rematchModal').classList.add('show');
+                } else if (data.rematchDeclined && data.rematchDeclined !== playerSymbol) {
+                    // Other player declined
+                    document.getElementById('waitingRematchModal').classList.remove('show');
+                    alert('Opponent declined the rematch');
+                    backToMenu();
+                }
             });
         }
 
@@ -982,6 +1112,8 @@
         // ============================================
         function startLocalGame() {
             gameMode = 'local';
+            player1Name = document.getElementById('player1Name').value.trim() || 'Player 1';
+            player2Name = document.getElementById('player2Name').value.trim() || 'Player 2';
             startGame();
         }
 
