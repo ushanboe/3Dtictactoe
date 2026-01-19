@@ -670,6 +670,13 @@
             const winner = checkWinner();
             if (winner) {
                 gameActive = false;
+                // Update Firebase FIRST so other player sees the result
+                if (gameMode === 'online' && gameRef) {
+                    gameRef.update({ 
+                        board: gameBoard.map(v => v === null ? '' : v),
+                        winner: winner 
+                    });
+                }
                 showWinModal(winner);
                 return;
             }
