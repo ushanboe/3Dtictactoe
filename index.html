@@ -1200,6 +1200,11 @@
                 gameRef.off();
                 gameRef = null;
             }
+
+            document.getElementById('gameScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'flex';
+            document.getElementById('winModal').style.display = 'none';
+            document.getElementById('waitingModal').style.display = 'none';
         }
 
         // Share game invite functions
@@ -1286,13 +1291,6 @@ ${share.text}`;
             if (nativeBtn && !navigator.share) {
                 nativeBtn.style.display = 'none';
             }
-        }
-
-
-            document.getElementById('gameScreen').style.display = 'none';
-            document.getElementById('menuScreen').style.display = 'flex';
-            document.getElementById('winModal').style.display = 'none';
-            document.getElementById('waitingModal').style.display = 'none';
         }
 
         function playAgain() {
