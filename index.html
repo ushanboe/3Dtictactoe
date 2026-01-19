@@ -958,9 +958,20 @@
         }
 
         function updateCellVisual(index, player) {
+            console.log('=== UPDATE CELL VISUAL ===');
             console.log('updateCellVisual called - index:', index, 'player:', player);
             const cell = cells[index];
-            console.log('Updating cell:', cell ? cell.userData : 'NO CELL', 'position:', cell ? cell.position : 'N/A');
+            if (cell) {
+                console.log('Cell userData:', cell.userData);
+                console.log('Cell local position:', cell.position.x.toFixed(2), cell.position.y.toFixed(2), cell.position.z.toFixed(2));
+                // Get world position
+                const worldPos = new THREE.Vector3();
+                cell.getWorldPosition(worldPos);
+                console.log('Cell WORLD position:', worldPos.x.toFixed(2), worldPos.y.toFixed(2), worldPos.z.toFixed(2));
+                console.log('Expected layer (from userData.y):', cell.userData.y, '(0=bottom, 1=middle, 2=top)');
+            } else {
+                console.error('NO CELL at index', index);
+            }
 
             // Remove old content
             cell.children.forEach(child => {
