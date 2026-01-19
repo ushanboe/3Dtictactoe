@@ -725,7 +725,7 @@
                 scene = new THREE.Scene();
 
             camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-            camera.position.set(6, 6, 6);
+            camera.position.set(7, 8, 7);  // Higher angle to see all 3 layers
             camera.lookAt(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -770,34 +770,49 @@
 
         function createCells() {
             cells = [];
-            const spacing = 1.5;
-            const offset = -1.5;
+            const cellSize = 1.2;      // Size of each cell
+            const cellSpacing = 1.4;   // Spacing between cell centers on same layer
+            const layerSpacing = 2.5;  // Vertical spacing between layers
+            const gridOffset = -1.4;   // Center the 3x3 grid
+            const layerOffset = -2.5;  // Center the 3 layers vertically
 
             for (let y = 0; y < 3; y++) {
+                // Create a platform/layer indicator
+                const platformGeometry = new THREE.BoxGeometry(cellSpacing * 3 + 0.2, 0.05, cellSpacing * 3 + 0.2);
+                const platformMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x222233,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+                platform.position.set(0, y * layerSpacing + layerOffset - 0.6, 0);
+                cubeGroup.add(platform);
+
                 for (let z = 0; z < 3; z++) {
                     for (let x = 0; x < 3; x++) {
-                        const geometry = new THREE.BoxGeometry(1, 1, 1);
+                        // Use thin flat boxes for cells (like tiles)
+                        const geometry = new THREE.BoxGeometry(cellSize, 0.15, cellSize);
                         const material = new THREE.MeshPhongMaterial({
-                            color: 0x334455,
+                            color: 0x445566,
                             transparent: true,
-                            opacity: 0.6,
-                            side: THREE.FrontSide  // Only render front faces
+                            opacity: 0.8,
+                            side: THREE.DoubleSide
                         });
 
                         const cell = new THREE.Mesh(geometry, material);
                         cell.position.set(
-                            x * spacing + offset,
-                            y * spacing + offset,
-                            z * spacing + offset
+                            x * cellSpacing + gridOffset,
+                            y * layerSpacing + layerOffset,
+                            z * cellSpacing + gridOffset
                         );
 
                         const index = y * 9 + z * 3 + x;
                         cell.userData = { index, x, y, z };
 
-                        // Add wireframe
+                        // Add wireframe border
                         const wireframe = new THREE.LineSegments(
                             new THREE.EdgesGeometry(geometry),
-                            new THREE.LineBasicMaterial({ color: 0x667eea, opacity: 0.5, transparent: true })
+                            new THREE.LineBasicMaterial({ color: 0x667eea, linewidth: 2 })
                         );
                         cell.add(wireframe);
 
@@ -806,6 +821,19 @@
                     }
                 }
             }
+
+            // Add vertical corner posts for visual structure
+            const postMaterial = new THREE.MeshPhongMaterial({ color: 0x667eea, transparent: true, opacity: 0.5 });
+            const postGeometry = new THREE.CylinderGeometry(0.05, 0.05, layerSpacing * 2 + 1, 8);
+            const corners = [
+                [-2.1, 0, -2.1], [2.1, 0, -2.1],
+                [-2.1, 0, 2.1], [2.1, 0, 2.1]
+            ];
+            corners.forEach(([px, py, pz]) => {
+                const post = new THREE.Mesh(postGeometry, postMaterial);
+                post.position.set(px, py, pz);
+                cubeGroup.add(post);
+            });
         }
 
         function onCanvasClick(event) {
@@ -914,32 +942,42 @@
                 }
             });
 
+            // Position symbols above the flat cell surface
+            const symbolHeight = 0.3;
+
             if (player === 'X') {
-                // Create X
+                // Create X - flat on the cell surface
                 const material = new THREE.MeshPhongMaterial({ color: 0x667eea, emissive: 0x334477 });
                 const group = new THREE.Group();
                 group.userData.isSymbol = true;
 
-                const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), material);
-                bar1.rotation.z = Math.PI / 4;
+                // Create X with bars lying flat (rotated to be horizontal)
+                const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.15, 0.12), material);
+                bar1.rotation.y = Math.PI / 4;
+                bar1.position.y = symbolHeight;
                 group.add(bar1);
 
-                const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), material);
-                bar2.rotation.z = -Math.PI / 4;
+                const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.15, 0.12), material);
+                bar2.rotation.y = -Math.PI / 4;
+                bar2.position.y = symbolHeight;
                 group.add(bar2);
 
                 cell.add(group);
-                cell.material.opacity = 0.1;
+                cell.material.opacity = 0.4;
+                cell.material.color.setHex(0x4455aa);
             } else if (player === 'O') {
-                // Create O
+                // Create O - flat torus on the cell surface
                 const material = new THREE.MeshPhongMaterial({ color: 0xf5576c, emissive: 0x773344 });
                 const torus = new THREE.Mesh(
-                    new THREE.TorusGeometry(0.3, 0.08, 16, 32),
+                    new THREE.TorusGeometry(0.35, 0.1, 16, 32),
                     material
                 );
+                torus.rotation.x = Math.PI / 2;  // Lay flat
+                torus.position.y = symbolHeight;
                 torus.userData.isSymbol = true;
                 cell.add(torus);
-                cell.material.opacity = 0.1;
+                cell.material.opacity = 0.4;
+                cell.material.color.setHex(0xaa4455);
             }
         }
 
@@ -1269,9 +1307,9 @@
             if (cells.length !== 27) return; // Wait for Three.js to initialize
             for (let i = 0; i < 27; i++) {
                 const cell = cells[i];
-                // Reset cell
-                cell.material.color.setHex(0x334455);
-                cell.material.opacity = 0.3;
+                // Reset cell to flat grid style
+                cell.material.color.setHex(0x445566);
+                cell.material.opacity = 0.8;
                 cell.material.emissive = new THREE.Color(0x000000);
 
                 // Remove symbols
