@@ -744,6 +744,9 @@
             window.addEventListener('resize', onWindowResize);
 
             animate();
+            } catch (e) {
+                console.error('Error initializing Three.js:', e);
+            }
         }
 
         function createCells() {
@@ -1188,7 +1191,13 @@
 
             if (!scene) initThreeJS();
 
-            resetBoard();
+            // For online mode, don't reset board - sync from Firebase instead
+            if (gameMode === 'online') {
+                gameActive = true;
+                syncBoardVisuals();
+            } else {
+                resetBoard();
+            }
             updateTurnDisplay();
             updateScoreDisplay();
         }
