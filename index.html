@@ -822,6 +822,18 @@
                 }
             }
 
+            // Verify cell array matches indices
+            console.log('=== CELL ARRAY VERIFICATION ===');
+            cells.forEach((c, arrayIdx) => {
+                if (c.userData.index !== arrayIdx) {
+                    console.error('MISMATCH! Array index:', arrayIdx, 'userData.index:', c.userData.index);
+                }
+            });
+            console.log('Cell 0 (should be bottom y=0):', cells[0].userData, 'pos.y:', cells[0].position.y);
+            console.log('Cell 22 (should be top y=2):', cells[22].userData, 'pos.y:', cells[22].position.y);
+            console.log('Cell 26 (should be top y=2):', cells[26].userData, 'pos.y:', cells[26].position.y);
+            console.log('=== END VERIFICATION ===');
+
             // Add vertical corner posts for visual structure
             const postMaterial = new THREE.MeshPhongMaterial({ color: 0x667eea, transparent: true, opacity: 0.5 });
             const postGeometry = new THREE.CylinderGeometry(0.05, 0.05, layerSpacing * 2 + 1, 8);
