@@ -829,7 +829,9 @@
             mouse.y = -(y / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(cells);
+            // Update world matrices to account for cube rotation
+            cubeGroup.updateMatrixWorld(true);
+            const intersects = raycaster.intersectObjects(cells, false);
 
             console.log('Mouse normalized:', mouse.x, mouse.y);
             console.log('Intersects count:', intersects.length);
@@ -1458,7 +1460,9 @@
             mouse.y = -(y / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(cells);
+            // Update world matrices to account for cube rotation
+            cubeGroup.updateMatrixWorld(true);
+            const intersects = raycaster.intersectObjects(cells, false);
 
             console.log('Mouse normalized:', mouse.x, mouse.y);
             console.log('Intersects count:', intersects.length);
