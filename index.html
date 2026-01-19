@@ -632,7 +632,7 @@
         // ==================== GAME STATE ====================
         let gameMode = 'ai'; // 'ai', 'local', 'online'
         let currentPlayer = 'X';
-        let gameBoard = Array(27).fill(null);
+        let gameBoard = new Array(27).fill(null);
         let scores = { X: 0, O: 0 };
         let roundsPlayed = 0;
         let maxRounds = 5;
@@ -814,7 +814,7 @@
             const winner = checkWinner();
             if (winner) {
                 handleWin(winner);
-            } else if (gameBoard.every(cell => cell !== null)) {
+            } else if (Array.isArray(gameBoard) && gameBoard.every(cell => cell !== null)) {
                 handleDraw();
             } else {
                 switchPlayer();
@@ -1062,7 +1062,11 @@
                 }
 
                 if (data.status === 'playing') {
-                    gameBoard = data.board || Array(27).fill(null);
+                    // Firebase may convert arrays to objects, ensure it's an array
+                    const boardData = data.board || Array(27).fill(null);
+                    gameBoard = Array.isArray(boardData) ? boardData : Object.values(boardData).map(v => v === undefined ? null : v);
+                    // Ensure exactly 27 elements
+                    while (gameBoard.length < 27) gameBoard.push(null);
                     currentPlayer = data.currentPlayer;
                     isMyTurn = currentPlayer === mySymbol;
                     syncBoardVisuals();
@@ -1128,7 +1132,11 @@
                         return;
                     }
 
-                    gameBoard = data.board || Array(27).fill(null);
+                    // Firebase may convert arrays to objects, ensure it's an array
+                    const boardData = data.board || Array(27).fill(null);
+                    gameBoard = Array.isArray(boardData) ? boardData : Object.values(boardData).map(v => v === undefined ? null : v);
+                    // Ensure exactly 27 elements
+                    while (gameBoard.length < 27) gameBoard.push(null);
                     currentPlayer = data.currentPlayer;
                     isMyTurn = currentPlayer === mySymbol;
                     console.log('Player 2 - currentPlayer:', currentPlayer, 'mySymbol:', mySymbol, 'isMyTurn:', isMyTurn, 'gameActive:', gameActive, 'cells.length:', cells.length);
