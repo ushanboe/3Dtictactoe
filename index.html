@@ -658,6 +658,7 @@
         let mySymbol = 'X';
         let roomRef = null;
         let currentRoomCode = null;
+        let onlineGameStarted = false; // Flag to prevent multiple startOnlineGame calls
 
         // Player names
         let player1Name = 'Player 1';
@@ -1109,9 +1110,10 @@
                 const data = snapshot.val();
                 if (!data) return;
 
-                if (data.status === 'playing' && data.player2) {
+                if (data.status === 'playing' && data.player2 && !onlineGameStarted) {
                     player2Name = data.player2;
                     document.getElementById('waitingOverlay').style.display = 'none';
+                    onlineGameStarted = true;
                     console.log("Calling startOnlineGame"); startOnlineGame();
                 }
 
@@ -1205,6 +1207,7 @@
                     }
                 });
 
+                onlineGameStarted = true;
                 console.log("Calling startOnlineGame"); startOnlineGame();
             });
         }
@@ -1362,6 +1365,7 @@
                 roomRef.remove();
                 roomRef = null;
             }
+            onlineGameStarted = false; // Reset flag
             document.getElementById('gameContainer').style.display = 'none';
             document.getElementById('menuContainer').style.display = 'flex';
         }
