@@ -1210,6 +1210,21 @@
                 isMyTurn = (currentPlayer === playerSymbol);
                 updateStatus();
 
+                // Check for game reset (Play Again pressed by either player)
+                const boardEmpty = newBoard.every(cell => cell === '' || cell === null);
+                if (boardEmpty && data.winner === '' && !gameActive) {
+                    // Game was reset - restart for both players
+                    playSound('soundStart');
+                    document.getElementById('winModal').style.display = 'none';
+                    gameActive = true;
+                    gameBoard = new Array(27).fill(null);
+                    currentPlayer = 'X';
+                    isMyTurn = (playerSymbol === 'X');
+                    createGrid();
+                    updateStatus();
+                    return;
+                }
+
                 // Check for game end from Firebase
                 if (data.winner && data.winner !== '') {
                     if (gameActive) {
@@ -1221,22 +1236,6 @@
                         gameActive = false;
                         showWinModal('draw');
                     }
-                }
-
-                // Handle rematch system
-                if (data.rematchAccepted) {
-                    // Other player accepted, reset game
-                    document.getElementById('waitingRematchModal').classList.remove('show');
-                    resetGame();
-                } else if (data.rematchRequest && data.rematchRequest !== playerSymbol && !rematchRequested) {
-                    // Other player requested rematch, show popup
-                    document.getElementById('winModal').classList.remove('show');
-                    document.getElementById('rematchModal').classList.add('show');
-                } else if (data.rematchDeclined && data.rematchDeclined !== playerSymbol) {
-                    // Other player declined
-                    document.getElementById('waitingRematchModal').classList.remove('show');
-                    alert('Opponent declined the rematch');
-                    backToMenu();
                 }
             });
         }
@@ -1438,23 +1437,19 @@ ${share.text}`;
         function playAgain() {
             document.getElementById('winModal').style.display = 'none';
 
-            if (gameMode === 'online') {
-                // Reset online game
-                if (gameRef) {
-                    gameRef.update({
-                        board: new Array(27).fill(''),
-                        currentPlayer: 'X',
-                        winner: ''
-                    });
-                }
-            }
-
-            createGrid();
-            initGame();
-
-            if (gameMode === 'online') {
-                isMyTurn = (playerSymbol === 'X');
-                updateStatus();
+            if (gameMode === 'online' && gameRef) {
+                // Reset game in Firebase - both players will restart via listener
+                gameRef.update({
+                    board: new Array(27).fill(''),
+                    currentPlayer: 'X',
+                    winner: ''
+                });
+                // The Firebase listener will handle the restart for both players
+            } else {
+                // Local/AI game - just restart locally
+                playSound('soundStart');
+                createGrid();
+                initGame();
             }
         }
 
