@@ -1129,7 +1129,9 @@
                     gameBoard = data.board || Array(27).fill(null);
                     currentPlayer = data.currentPlayer;
                     isMyTurn = currentPlayer === mySymbol;
-                    syncBoardVisuals();
+                    if (cells.length === 27) {
+                        syncBoardVisuals();
+                    }
                     updateTurnDisplay();
 
                     const winner = checkWinner();
@@ -1160,6 +1162,7 @@
         }
 
         function syncBoardVisuals() {
+            if (cells.length !== 27) return; // Wait for Three.js to initialize
             for (let i = 0; i < 27; i++) {
                 const cell = cells[i];
                 // Reset cell
@@ -1254,6 +1257,7 @@
             gameActive = true;
             isMyTurn = mySymbol === 'X' || gameMode !== 'online';
 
+            if (cells.length !== 27) return; // Wait for Three.js to initialize
             cells.forEach(cell => {
                 cell.material.color.setHex(0x334455);
                 cell.material.opacity = 0.3;
