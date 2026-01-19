@@ -899,8 +899,14 @@
         }
 
         function makeMove(index) {
+            console.log('=== MAKE MOVE ===' );
+            console.log('makeMove called with index:', index);
+            console.log('Cell at this index:', cells[index] ? cells[index].userData : 'NO CELL');
             ensureGameBoardArray(); // Ensure gameBoard is an array
-            if (gameBoard[index] !== null) return;
+            if (gameBoard[index] !== null) {
+                console.log('Cell already occupied, returning');
+                return;
+            }
 
             gameBoard[index] = currentPlayer;
             updateCellVisual(index, currentPlayer);
@@ -933,7 +939,9 @@
         }
 
         function updateCellVisual(index, player) {
+            console.log('updateCellVisual called - index:', index, 'player:', player);
             const cell = cells[index];
+            console.log('Updating cell:', cell ? cell.userData : 'NO CELL', 'position:', cell ? cell.position : 'N/A');
 
             // Remove old content
             cell.children.forEach(child => {
