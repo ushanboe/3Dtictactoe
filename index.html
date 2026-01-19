@@ -685,10 +685,24 @@
         ].map(p => p.flat ? p : p);
 
         function initThreeJS() {
-            const canvas = document.getElementById('gameCanvas');
-            const container = canvas.parentElement;
+            console.log('initThreeJS called');
+            try {
+                const canvas = document.getElementById('gameCanvas');
+                if (!canvas) {
+                    console.error('Canvas element not found!');
+                    return;
+                }
+                const container = canvas.parentElement;
+                console.log('Canvas size:', canvas.clientWidth, 'x', canvas.clientHeight);
 
-            scene = new THREE.Scene();
+                // Ensure canvas has dimensions
+                if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+                    console.log('Canvas has no size, setting default');
+                    canvas.style.width = '100%';
+                    canvas.style.height = '400px';
+                }
+
+                scene = new THREE.Scene();
 
             camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
             camera.position.set(6, 6, 6);
@@ -1058,7 +1072,7 @@
                 if (data.status === 'playing' && data.player2) {
                     player2Name = data.player2;
                     document.getElementById('waitingOverlay').style.display = 'none';
-                    startOnlineGame();
+                    console.log("Calling startOnlineGame"); startOnlineGame();
                 }
 
                 if (data.status === 'playing') {
@@ -1151,11 +1165,12 @@
                     }
                 });
 
-                startOnlineGame();
+                console.log("Calling startOnlineGame"); startOnlineGame();
             });
         }
 
         function startOnlineGame() {
+            console.log('startOnlineGame called');
             gameMode = 'online';
             document.getElementById('p1Name').textContent = player1Name;
             document.getElementById('p2Name').textContent = player2Name;
