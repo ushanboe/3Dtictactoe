@@ -812,9 +812,10 @@
             // Check total movement from start - if small, treat as click not drag
             const totalMoveX = Math.abs(event.clientX - mouseStartPosition.x);
             const totalMoveY = Math.abs(event.clientY - mouseStartPosition.y);
-            const wasActualDrag = totalMoveX > 10 || totalMoveY > 10;
+            const wasActualDrag = totalMoveX > 30 || totalMoveY > 30; // Increased threshold
 
             console.log('Click detected - totalMove:', totalMoveX, totalMoveY, 'wasActualDrag:', wasActualDrag, 'gameActive:', gameActive, 'gameMode:', gameMode, 'isMyTurn:', isMyTurn, 'mySymbol:', mySymbol);
+            console.log('Click screen coords:', event.clientX, event.clientY);
             if (wasActualDrag) return;
             if (!gameActive) return;
             if (gameMode === 'online' && !isMyTurn) return;
@@ -1410,6 +1411,8 @@
                     if (gameBoard[cell.userData.index] === null) {
                         cell.material.emissive.setHex(0x222244);
                         hoveredCell = cell;
+                        // Debug: show which cell is being hovered
+                        console.log('Hover cell:', cell.userData.index, 'pos:', cell.userData.x, cell.userData.y, cell.userData.z);
                     }
                 } else {
                     hoveredCell = null;
