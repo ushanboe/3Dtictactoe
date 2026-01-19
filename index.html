@@ -913,8 +913,15 @@
                 console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
 
                 ensureGameBoardArray(); // Ensure gameBoard is an array
+                console.log('Checking gameBoard[' + index + ']:', gameBoard[index]);
+                console.log('gameBoard type:', typeof gameBoard, 'isArray:', Array.isArray(gameBoard));
+                console.log('gameBoard length:', gameBoard.length);
+                console.log('Full gameBoard:', JSON.stringify(gameBoard));
                 if (gameBoard[index] === null) {
+                    console.log('Cell is empty, calling makeMove');
                     makeMove(index);
+                } else {
+                    console.log('Cell is NOT empty, value:', gameBoard[index]);
                 }
             }
         }
@@ -1633,8 +1640,15 @@
                 console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
 
                 ensureGameBoardArray(); // Ensure gameBoard is an array
+                console.log('Checking gameBoard[' + index + ']:', gameBoard[index]);
+                console.log('gameBoard type:', typeof gameBoard, 'isArray:', Array.isArray(gameBoard));
+                console.log('gameBoard length:', gameBoard.length);
+                console.log('Full gameBoard:', JSON.stringify(gameBoard));
                 if (gameBoard[index] === null) {
+                    console.log('Cell is empty, calling makeMove');
                     makeMove(index);
+                } else {
+                    console.log('Cell is NOT empty, value:', gameBoard[index]);
                 }
             }
         }
