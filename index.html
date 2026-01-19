@@ -653,6 +653,7 @@
         let autoRotate = true;
         let isDragging = false;
         let previousMousePosition = { x: 0, y: 0 };
+        let mouseStartPosition = { x: 0, y: 0 };
 
         // Win patterns for 3D tic-tac-toe
         const winPatterns = [
@@ -786,8 +787,13 @@
         }
 
         function onCanvasClick(event) {
-            console.log('Click detected - isDragging:', isDragging, 'gameActive:', gameActive, 'gameMode:', gameMode, 'isMyTurn:', isMyTurn, 'mySymbol:', mySymbol);
-            if (isDragging) return;
+            // Check total movement from start - if small, treat as click not drag
+            const totalMoveX = Math.abs(event.clientX - mouseStartPosition.x);
+            const totalMoveY = Math.abs(event.clientY - mouseStartPosition.y);
+            const wasActualDrag = totalMoveX > 10 || totalMoveY > 10;
+
+            console.log('Click detected - totalMove:', totalMoveX, totalMoveY, 'wasActualDrag:', wasActualDrag, 'gameActive:', gameActive, 'gameMode:', gameMode, 'isMyTurn:', isMyTurn, 'mySymbol:', mySymbol);
+            if (wasActualDrag) return;
             if (!gameActive) return;
             if (gameMode === 'online' && !isMyTurn) return;
 
@@ -1317,6 +1323,7 @@
         // ==================== MOUSE/TOUCH CONTROLS ====================
         function onMouseDown(e) {
             isDragging = false;
+            mouseStartPosition = { x: e.clientX, y: e.clientY };
             previousMousePosition = { x: e.clientX, y: e.clientY };
         }
 
