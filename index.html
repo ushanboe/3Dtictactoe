@@ -1152,6 +1152,8 @@
             document.getElementById('menuContainer').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'flex';
 
+            if (!scene) initThreeJS();
+
             resetBoard();
             updateTurnDisplay();
             updateScoreDisplay();
