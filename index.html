@@ -302,11 +302,119 @@
             font-weight: normal;
         }
     </style>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Arcade Style Animations */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            25% { transform: translateY(-15px) scale(1.02); }
+            50% { transform: translateY(0) scale(1); }
+            75% { transform: translateY(-8px) scale(1.01); }
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 10px #ff6b6b, 0 0 20px #ff6b6b, 0 0 30px #ff6b6b; }
+            50% { text-shadow: 0 0 20px #4ecdc4, 0 0 40px #4ecdc4, 0 0 60px #4ecdc4; }
+        }
+
+        @keyframes rainbow {
+            0% { color: #ff6b6b; }
+            20% { color: #ffd93d; }
+            40% { color: #6bcb77; }
+            60% { color: #4ecdc4; }
+            80% { color: #9b59b6; }
+            100% { color: #ff6b6b; }
+        }
+
+        .game-title {
+            font-family: 'Press Start 2P', cursive !important;
+            font-size: 2rem !important;
+            animation: bounce 2s ease-in-out infinite, glow 3s ease-in-out infinite, rainbow 5s linear infinite;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 30px !important;
+            cursor: default;
+            user-select: none;
+        }
+
+        .game-title:hover {
+            animation: bounce 0.5s ease-in-out infinite, glow 0.5s ease-in-out infinite;
+        }
+
+        /* Arcade button style */
+        .btn {
+            font-family: 'Press Start 2P', cursive !important;
+            font-size: 0.7rem !important;
+            letter-spacing: 1px;
+            transition: all 0.1s ease;
+            box-shadow: 0 4px 0 #333;
+            position: relative;
+            top: 0;
+        }
+
+        .btn:hover {
+            top: 2px;
+            box-shadow: 0 2px 0 #333;
+        }
+
+        .btn:active {
+            top: 4px;
+            box-shadow: 0 0px 0 #333;
+        }
+
+        /* Modal titles arcade style */
+        .modal h2 {
+            font-family: 'Press Start 2P', cursive !important;
+            font-size: 1rem !important;
+        }
+    
+        .sound-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #4ecdc4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.2s;
+        }
+
+        .sound-toggle:hover {
+            background: rgba(78, 205, 196, 0.3);
+            transform: scale(1.1);
+        }
+    </style>
 </head>
 <body>
+    <!-- Arcade Sound Effects -->
+    <audio id="soundClick" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="soundPlace" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="soundWin" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="soundDraw" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="soundStart" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="soundHover" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3" type="audio/mpeg">
+    </audio>
+
     <!-- Menu Screen -->
     <div id="menuScreen" class="menu-container">
         <h1 class="game-title">3D Tic-Tac-Toe</h1>
+        <button id="soundToggle" class="sound-toggle" onclick="toggleSound()">🔊</button>
         <p class="game-subtitle">Three layers, infinite fun!</p>
 
         <div class="menu-card">
@@ -408,6 +516,37 @@
     </div>
 
     <script>
+        // ============================================
+        // SOUND EFFECTS
+        // ============================================
+        let soundEnabled = true;
+
+        function playSound(soundId) {
+            if (!soundEnabled) return;
+            try {
+                const sound = document.getElementById(soundId);
+                if (sound) {
+                    sound.currentTime = 0;
+                    sound.volume = 0.3;
+                    sound.play().catch(() => {});
+                }
+            } catch(e) {}
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundToggle').textContent = soundEnabled ? '🔊' : '🔇';
+            if (soundEnabled) playSound('soundClick');
+        }
+
+        // Add hover sounds to buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.addEventListener('mouseenter', () => playSound('soundHover'));
+                btn.addEventListener('click', () => playSound('soundClick'));
+            });
+        });
+
         // ============================================
         // FIREBASE CONFIGURATION
         // ============================================
@@ -747,6 +886,7 @@
             if (!gameActive || gameBoard[index] !== null) return;
 
             gameBoard[index] = currentPlayer;
+            playSound('soundPlace');
             updateCellVisual(index, currentPlayer);
 
             // Check for win
@@ -1153,6 +1293,7 @@
         // GAME FLOW
         // ============================================
         function startLocalGame() {
+            playSound('soundStart');
             gameMode = 'local';
             player1Name = document.getElementById('player1Name').value.trim() || 'Player 1';
             player2Name = document.getElementById('player2Name').value.trim() || 'Player 2';
@@ -1160,6 +1301,7 @@
         }
 
         function startAIGame() {
+            playSound('soundStart');
             gameMode = 'ai';
             startGame();
         }
@@ -1317,6 +1459,11 @@ ${share.text}`;
         }
 
         function showWinModal(result) {
+            if (result === 'draw') {
+                playSound('soundDraw');
+            } else {
+                playSound('soundWin');
+            }
             const titleEl = document.getElementById('winTitle');
             const msgEl = document.getElementById('winMessage');
 
