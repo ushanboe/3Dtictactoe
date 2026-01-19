@@ -1390,25 +1390,43 @@
 
         function syncBoardVisuals() {
             if (cells.length !== 27) return; // Wait for Three.js to initialize
+            console.log('=== SYNC BOARD VISUALS ===');
+            console.log('gameBoard:', JSON.stringify(gameBoard));
+
             for (let i = 0; i < 27; i++) {
                 const cell = cells[i];
-                // Reset cell to flat grid style
-                cell.material.color.setHex(0x445566);
-                cell.material.opacity = 0.8;
-                cell.material.emissive = new THREE.Color(0x000000);
+                const expectedSymbol = gameBoard[i];
 
-                // Remove symbols
-                const toRemove = [];
+                // Check what symbol is currently displayed on this cell
+                let currentSymbol = null;
                 cell.children.forEach(child => {
                     if (child.userData && child.userData.isSymbol) {
-                        toRemove.push(child);
+                        currentSymbol = child.userData.player;
                     }
                 });
-                toRemove.forEach(child => cell.remove(child));
 
-                // Add current symbol
-                if (gameBoard[i]) {
-                    updateCellVisual(i, gameBoard[i]);
+                // Only update if the symbol has changed
+                if (currentSymbol !== expectedSymbol) {
+                    console.log('Cell', i, 'changed from', currentSymbol, 'to', expectedSymbol);
+
+                    // Reset cell appearance
+                    cell.material.color.setHex(0x445566);
+                    cell.material.opacity = 0.8;
+                    cell.material.emissive = new THREE.Color(0x000000);
+
+                    // Remove old symbol if any
+                    const toRemove = [];
+                    cell.children.forEach(child => {
+                        if (child.userData && child.userData.isSymbol) {
+                            toRemove.push(child);
+                        }
+                    });
+                    toRemove.forEach(child => cell.remove(child));
+
+                    // Add new symbol if needed
+                    if (expectedSymbol) {
+                        updateCellVisual(i, expectedSymbol);
+                    }
                 }
             }
         }
