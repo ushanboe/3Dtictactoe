@@ -839,15 +839,27 @@
             console.log('Intersects count:', intersects.length);
 
             if (intersects.length > 0) {
-                // Log all intersections for debugging
-                console.log('=== CLICK DEBUG ===' );
-                console.log('Total intersections:', intersects.length);
-                intersects.forEach((hit, i) => {
-                    const c = hit.object;
-                    console.log(`  [${i}] cell index: ${c.userData.index}, xyz: (${c.userData.x},${c.userData.y},${c.userData.z}), distance: ${hit.distance.toFixed(2)}`);
+                // Get camera direction for filtering front-facing hits
+                const cameraDirection = new THREE.Vector3();
+                camera.getWorldDirection(cameraDirection);
+
+                // Filter to only front-facing intersections (face normal pointing toward camera)
+                const frontFacingHits = intersects.filter(hit => {
+                    if (!hit.face) return false;
+                    // Transform face normal to world space
+                    const worldNormal = hit.face.normal.clone();
+                    worldNormal.transformDirection(hit.object.matrixWorld);
+                    // Check if face is pointing toward camera (dot product with camera direction < 0)
+                    return worldNormal.dot(cameraDirection) < 0;
                 });
 
-                const cell = intersects[0].object;
+                console.log('=== CLICK DEBUG ===' );
+                console.log('Total intersections:', intersects.length, 'Front-facing:', frontFacingHits.length);
+
+                // Use front-facing hits if available, otherwise fall back to all hits
+                const validHits = frontFacingHits.length > 0 ? frontFacingHits : intersects;
+
+                const cell = validHits[0].object;
                 const index = cell.userData.index;
                 console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
 
@@ -1511,15 +1523,27 @@
             console.log('Intersects count:', intersects.length);
 
             if (intersects.length > 0) {
-                // Log all intersections for debugging
-                console.log('=== CLICK DEBUG ===' );
-                console.log('Total intersections:', intersects.length);
-                intersects.forEach((hit, i) => {
-                    const c = hit.object;
-                    console.log(`  [${i}] cell index: ${c.userData.index}, xyz: (${c.userData.x},${c.userData.y},${c.userData.z}), distance: ${hit.distance.toFixed(2)}`);
+                // Get camera direction for filtering front-facing hits
+                const cameraDirection = new THREE.Vector3();
+                camera.getWorldDirection(cameraDirection);
+
+                // Filter to only front-facing intersections (face normal pointing toward camera)
+                const frontFacingHits = intersects.filter(hit => {
+                    if (!hit.face) return false;
+                    // Transform face normal to world space
+                    const worldNormal = hit.face.normal.clone();
+                    worldNormal.transformDirection(hit.object.matrixWorld);
+                    // Check if face is pointing toward camera (dot product with camera direction < 0)
+                    return worldNormal.dot(cameraDirection) < 0;
                 });
 
-                const cell = intersects[0].object;
+                console.log('=== CLICK DEBUG ===' );
+                console.log('Total intersections:', intersects.length, 'Front-facing:', frontFacingHits.length);
+
+                // Use front-facing hits if available, otherwise fall back to all hits
+                const validHits = frontFacingHits.length > 0 ? frontFacingHits : intersects;
+
+                const cell = validHits[0].object;
                 const index = cell.userData.index;
                 console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
 
