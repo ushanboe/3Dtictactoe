@@ -1229,7 +1229,26 @@
                 if (data.status === 'playing') {
                     // Firebase may convert arrays to objects, ensure it's an array
                     const boardData = data.board || Array(27).fill(null);
-                    gameBoard = Array.isArray(boardData) ? boardData : Object.values(boardData).map(v => v === undefined ? null : v);
+                    console.log('=== FIREBASE BOARD DATA ===');
+                    console.log('Raw boardData from Firebase:', JSON.stringify(boardData));
+                    console.log('boardData type:', typeof boardData, 'isArray:', Array.isArray(boardData));
+
+                    if (Array.isArray(boardData)) {
+                        gameBoard = boardData;
+                        console.log('Using boardData as array directly');
+                    } else {
+                        // Firebase converted array to object - need to reconstruct properly
+                        console.log('Firebase converted to object, reconstructing array...');
+                        console.log('Object keys:', Object.keys(boardData));
+                        gameBoard = Array(27).fill(null);
+                        for (const key in boardData) {
+                            const idx = parseInt(key, 10);
+                            if (!isNaN(idx) && idx >= 0 && idx < 27) {
+                                gameBoard[idx] = boardData[key] === undefined ? null : boardData[key];
+                            }
+                        }
+                        console.log('Reconstructed gameBoard:', JSON.stringify(gameBoard));
+                    }
                     // Ensure exactly 27 elements
                     while (gameBoard.length < 27) gameBoard.push(null);
                     currentPlayer = data.currentPlayer;
@@ -1299,7 +1318,26 @@
 
                     // Firebase may convert arrays to objects, ensure it's an array
                     const boardData = data.board || Array(27).fill(null);
-                    gameBoard = Array.isArray(boardData) ? boardData : Object.values(boardData).map(v => v === undefined ? null : v);
+                    console.log('=== FIREBASE BOARD DATA ===');
+                    console.log('Raw boardData from Firebase:', JSON.stringify(boardData));
+                    console.log('boardData type:', typeof boardData, 'isArray:', Array.isArray(boardData));
+
+                    if (Array.isArray(boardData)) {
+                        gameBoard = boardData;
+                        console.log('Using boardData as array directly');
+                    } else {
+                        // Firebase converted array to object - need to reconstruct properly
+                        console.log('Firebase converted to object, reconstructing array...');
+                        console.log('Object keys:', Object.keys(boardData));
+                        gameBoard = Array(27).fill(null);
+                        for (const key in boardData) {
+                            const idx = parseInt(key, 10);
+                            if (!isNaN(idx) && idx >= 0 && idx < 27) {
+                                gameBoard[idx] = boardData[key] === undefined ? null : boardData[key];
+                            }
+                        }
+                        console.log('Reconstructed gameBoard:', JSON.stringify(gameBoard));
+                    }
                     // Ensure exactly 27 elements
                     while (gameBoard.length < 27) gameBoard.push(null);
                     currentPlayer = data.currentPlayer;
