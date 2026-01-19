@@ -887,6 +887,13 @@
                 // Use front-facing hits if available, otherwise fall back to all hits
                 const validHits = frontFacingHits.length > 0 ? frontFacingHits : intersects;
 
+                // Log all valid hits with their layer info
+                console.log('Valid hits (sorted by distance):');
+                validHits.forEach((hit, i) => {
+                    const c = hit.object;
+                    console.log(`  [${i}] index:${c.userData.index} layer:${c.userData.y} dist:${hit.distance.toFixed(3)} pos:(${c.position.x.toFixed(1)},${c.position.y.toFixed(1)},${c.position.z.toFixed(1)})`);
+                });
+
                 const cell = validHits[0].object;
                 const index = cell.userData.index;
                 console.log('SELECTED cell index:', index, 'at position:', cell.userData.x, cell.userData.y, cell.userData.z);
@@ -1588,6 +1595,13 @@
 
                 // Use front-facing hits if available, otherwise fall back to all hits
                 const validHits = frontFacingHits.length > 0 ? frontFacingHits : intersects;
+
+                // Log all valid hits with their layer info
+                console.log('Valid hits (sorted by distance):');
+                validHits.forEach((hit, i) => {
+                    const c = hit.object;
+                    console.log(`  [${i}] index:${c.userData.index} layer:${c.userData.y} dist:${hit.distance.toFixed(3)} pos:(${c.position.x.toFixed(1)},${c.position.y.toFixed(1)},${c.position.z.toFixed(1)})`);
+                });
 
                 const cell = validHits[0].object;
                 const index = cell.userData.index;
