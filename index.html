@@ -121,7 +121,12 @@
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.05);
             color: white;
-            font-size: 1rem;
+            font-size: 1.2rem;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 4px;
             margin-bottom: 12px;
         }
 
@@ -672,14 +677,17 @@
             // Check for draw
             if (gameBoard.every(cell => cell !== null)) {
                 gameActive = false;
+                if (gameMode === 'online' && gameRef) {
+                    gameRef.update({ winner: 'draw' });
+                }
                 showWinModal('draw');
                 return;
             }
 
             // Handle turn switching based on game mode
             if (gameMode === 'online') {
-                // Update Firebase
-                updateOnlineGame();
+                // Update Firebase with winner if any
+                updateOnlineGame(winner);
                 isMyTurn = false;
                 updateStatus();
             } else {
@@ -824,7 +832,8 @@
                 currentPlayer: 'X',
                 player1: true,
                 player2: false,
-                status: 'waiting'
+                status: 'waiting',
+                winner: ''
             });
 
             // Show waiting modal
@@ -898,26 +907,35 @@
                 isMyTurn = (currentPlayer === playerSymbol);
                 updateStatus();
 
-                // Check for game end
-                const winner = checkWinner();
-                if (winner) {
-                    gameActive = false;
-                    showWinModal(winner);
+                // Check for game end from Firebase
+                if (data.winner && data.winner !== '') {
+                    if (gameActive) {
+                        gameActive = false;
+                        showWinModal(data.winner);
+                    }
                 } else if (gameBoard.every(cell => cell !== null)) {
-                    gameActive = false;
-                    showWinModal('draw');
+                    if (gameActive) {
+                        gameActive = false;
+                        showWinModal('draw');
+                    }
                 }
             });
         }
 
-        function updateOnlineGame() {
+        function updateOnlineGame(winner = null) {
             if (!gameRef) return;
 
             const nextPlayer = currentPlayer === 'X' ? 'O' : 'X';
-            gameRef.update({
+            const updateData = {
                 board: gameBoard.map(v => v === null ? '' : v),
                 currentPlayer: nextPlayer
-            });
+            };
+
+            if (winner) {
+                updateData.winner = winner;
+            }
+
+            gameRef.update(updateData);
         }
 
         function ensureArray(data) {
@@ -1015,7 +1033,8 @@
                 if (gameRef) {
                     gameRef.update({
                         board: new Array(27).fill(''),
-                        currentPlayer: 'X'
+                        currentPlayer: 'X',
+                        winner: ''
                     });
                 }
             }
