@@ -257,6 +257,34 @@
             color: #667eea;
         }
 
+        .share-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .btn-share {
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-share:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-share:active {
+            transform: translateY(0);
+        }
+
         .hidden { display: none !important; }
 
         .player-names {
@@ -340,6 +368,20 @@
             <div class="game-code-display">
                 <p>Share this code:</p>
                 <div class="game-code" id="waitingGameCode">----</div>
+            </div>
+            <div class="share-buttons">
+                <button class="btn btn-share" onclick="shareGame('native')" id="nativeShareBtn">
+                    📤 Share
+                </button>
+                <button class="btn btn-share" onclick="shareGame('sms')">
+                    💬 Text
+                </button>
+                <button class="btn btn-share" onclick="shareGame('email')">
+                    📧 Email
+                </button>
+                <button class="btn btn-share" onclick="shareGame('copy')">
+                    📋 Copy
+                </button>
             </div>
             <p>Waiting for player 2 to join...</p>
             <button class="btn btn-secondary" onclick="cancelOnlineGame()">Cancel</button>
@@ -1137,6 +1179,7 @@
             // Initialize Three.js if needed
             if (!renderer) {
                 initThreeJS();
+        updateShareButtons();
             } else {
                 // Reset the grid
                 createGrid();
@@ -1157,6 +1200,93 @@
                 gameRef.off();
                 gameRef = null;
             }
+
+        // Share game invite functions
+        function getShareText() {
+            const gameUrl = window.location.href.split('?')[0];
+            return {
+                title: "🎮 3D Tic-Tac-Toe Challenge!",
+                text: `Hey! I'm challenging you to a game of 3D Tic-Tac-Toe! 🍩🌭
+
+Game Code: ${gameCode}
+
+Join here: ${gameUrl}
+
+Enter the code and let's play!`,
+                url: gameUrl
+            };
+        }
+
+        async function shareGame(method) {
+            const share = getShareText();
+            const fullMessage = `${share.title}
+
+${share.text}`;
+
+            switch(method) {
+                case 'native':
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: share.title,
+                                text: share.text,
+                                url: share.url
+                            });
+                        } catch(err) {
+                            if (err.name !== 'AbortError') {
+                                console.log('Share failed:', err);
+                            }
+                        }
+                    } else {
+                        shareGame('copy');
+                    }
+                    break;
+
+                case 'sms':
+                    const smsBody = encodeURIComponent(share.text);
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                    const smsUrl = isIOS ? `sms:&body=${smsBody}` : `sms:?body=${smsBody}`;
+                    window.open(smsUrl, '_blank');
+                    break;
+
+                case 'email':
+                    const subject = encodeURIComponent(share.title);
+                    const body = encodeURIComponent(share.text);
+                    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+                    break;
+
+                case 'copy':
+                    try {
+                        await navigator.clipboard.writeText(fullMessage);
+                        const btn = event.target;
+                        const originalText = btn.textContent;
+                        btn.textContent = '✅ Copied!';
+                        btn.style.background = 'rgba(78, 205, 196, 0.3)';
+                        setTimeout(() => {
+                            btn.textContent = originalText;
+                            btn.style.background = '';
+                        }, 2000);
+                    } catch(err) {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = fullMessage;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        alert('Copied to clipboard!');
+                    }
+                    break;
+            }
+        }
+
+        // Hide native share button if not supported
+        function updateShareButtons() {
+            const nativeBtn = document.getElementById('nativeShareBtn');
+            if (nativeBtn && !navigator.share) {
+                nativeBtn.style.display = 'none';
+            }
+        }
+
 
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('menuScreen').style.display = 'flex';
