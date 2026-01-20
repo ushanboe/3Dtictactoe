@@ -1035,8 +1035,8 @@
 
             // Handle turn switching based on game mode
             if (gameMode === 'online') {
-                // Update Firebase with winner if any
-                updateOnlineGame(winner);
+                // Update Firebase (no winner at this point)
+                updateOnlineGame(null);
                 isMyTurn = false;
                 updateStatus();
             } else {
