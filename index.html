@@ -535,6 +535,7 @@
 
             <div class="menu-section">
                 <h3>Play Online</h3>
+                <input type="text" id="onlinePlayerName" class="input-field name-input" placeholder="Your name" maxlength="12">
                 <button class="btn btn-primary" onclick="createOnlineGame()">Create Game</button>
                 <input type="text" id="joinCodeInput" class="input-field" placeholder="Enter game code" maxlength="6" onkeypress="if(event.key==='Enter')joinOnlineGame()">
                 <button class="btn btn-secondary" onclick="joinOnlineGame()">Join Game</button>
@@ -578,6 +579,7 @@
     <div id="waitingModal" class="modal">
         <div class="modal-content">
             <h2>Waiting for Opponent</h2>
+            <p id="waitingPlayerName" style="color: #4ecdc4; margin-bottom: 15px;">Playing as: Player 1</p>
             <div class="game-code-display">
                 <p>Share this code:</p>
                 <div class="game-code" id="waitingGameCode">----</div>
@@ -1237,15 +1239,21 @@
         function updateStatus() {
             const statusEl = document.getElementById('gameStatus');
             if (gameMode === 'online') {
+                // Get my name and opponent's name based on my symbol
+                const myName = playerSymbol === 'X' ? player1Name : player2Name;
+                const opponentName = playerSymbol === 'X' ? player2Name : player1Name;
+
                 if (isMyTurn) {
-                    statusEl.textContent = `Your turn (${playerSymbol})`;
+                    statusEl.textContent = `${myName}'s turn (${playerSymbol})`;
                     statusEl.style.color = '#4ecdc4';
                 } else {
-                    statusEl.textContent = `Opponent's turn`;
+                    statusEl.textContent = `${opponentName}'s turn`;
                     statusEl.style.color = '#aaa';
                 }
             } else {
-                statusEl.textContent = `${currentPlayer}'s Turn`;
+                // Local/AI mode - use player names
+                const name = currentPlayer === 'X' ? player1Name : player2Name;
+                statusEl.textContent = `${name}'s Turn (${currentPlayer})`;
                 statusEl.style.color = currentPlayer === 'X' ? '#ff6b6b' : '#4ecdc4';
             }
         }
@@ -1292,12 +1300,17 @@
             playerSymbol = 'X';
             isMyTurn = true;
 
+            // Get player name (default if empty)
+            player1Name = document.getElementById('onlinePlayerName').value.trim() || 'Player 1';
+
             gameRef = database.ref('games/' + gameCode);
             gameRef.set({
                 board: gameBoard.map(v => v === null ? '' : v),
                 currentPlayer: 'X',
                 player1: true,
                 player2: false,
+                player1Name: player1Name,
+                player2Name: '',
                 status: 'waiting',
                 winner: '',
                 rematchRequest: '',
@@ -1307,13 +1320,15 @@
 
             // Show waiting modal
             document.getElementById('waitingGameCode').textContent = gameCode;
+            document.getElementById('waitingPlayerName').textContent = `Playing as: ${player1Name}`;
             document.getElementById('waitingModal').style.display = 'flex';
 
             // Listen for player 2
             gameRef.on('value', snapshot => {
                 const data = snapshot.val();
                 if (data && data.player2 && data.status === 'waiting') {
-                    // Player 2 joined, start game
+                    // Player 2 joined - get their name
+                    player2Name = data.player2Name || 'Player 2';
                     gameRef.update({ status: 'playing' });
                     document.getElementById('waitingModal').style.display = 'none';
                     startGame();
@@ -1335,6 +1350,9 @@
             playerSymbol = 'O';
             isMyTurn = false;
 
+            // Get player name (default if empty)
+            player2Name = document.getElementById('onlinePlayerName').value.trim() || 'Player 2';
+
             gameRef = database.ref('games/' + gameCode);
             gameRef.once('value', snapshot => {
                 const data = snapshot.val();
@@ -1347,8 +1365,11 @@
                     return;
                 }
 
-                // Join the game
-                gameRef.update({ player2: true });
+                // Get player 1's name from Firebase
+                player1Name = data.player1Name || 'Player 1';
+
+                // Join the game with our name
+                gameRef.update({ player2: true, player2Name: player2Name });
                 startGame();
                 setupOnlineListener();
             });
@@ -1480,6 +1501,9 @@
         function startAIGame() {
             playSound('soundStart');
             gameMode = 'ai';
+            // Set player names - use input if available, otherwise defaults
+            player1Name = document.getElementById('player1Name').value.trim() || 'Player';
+            player2Name = 'Computer';
             startGame();
         }
 
@@ -1645,16 +1669,20 @@ ${share.text}`;
                 titleEl.className = 'winner-draw';
                 msgEl.textContent = 'No winner this time.';
             } else {
+                // Get winner's name based on symbol
+                const winnerName = result === 'X' ? player1Name : player2Name;
+
                 if (gameMode === 'online') {
+                    const myName = playerSymbol === 'X' ? player1Name : player2Name;
                     if (result === playerSymbol) {
-                        titleEl.textContent = 'You Win! 🎉';
+                        titleEl.textContent = `${myName} Wins! 🎉`;
                         msgEl.textContent = 'Congratulations!';
                     } else {
-                        titleEl.textContent = 'You Lose';
+                        titleEl.textContent = `${winnerName} Wins!`;
                         msgEl.textContent = 'Better luck next time!';
                     }
                 } else {
-                    titleEl.textContent = `Player ${result} Wins!`;
+                    titleEl.textContent = `${winnerName} Wins!`;
                     msgEl.textContent = 'Congratulations!';
                 }
                 titleEl.className = result === 'X' ? 'winner-x' : 'winner-o';
