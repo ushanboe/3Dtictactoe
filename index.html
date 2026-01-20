@@ -536,7 +536,7 @@
             <div class="menu-section">
                 <h3>Play Online</h3>
                 <button class="btn btn-primary" onclick="createOnlineGame()">Create Game</button>
-                <input type="text" id="joinCodeInput" class="input-field" placeholder="Enter game code" maxlength="6">
+                <input type="text" id="joinCodeInput" class="input-field" placeholder="Enter game code" maxlength="6" onkeypress="if(event.key==='Enter')joinOnlineGame()">
                 <button class="btn btn-secondary" onclick="joinOnlineGame()">Join Game</button>
             </div>
         </div>
