@@ -301,7 +301,105 @@
             font-size: 0.9rem;
             font-weight: normal;
         }
-    </style>
+    
+        /* Starfield Background */
+        .starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+        }
+
+        .stars-layer1 {
+            background-image: radial-gradient(2px 2px at 20px 30px, #fff, transparent),
+                              radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                              radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                              radial-gradient(2px 2px at 160px 120px, rgba(255,255,255,0.9), transparent),
+                              radial-gradient(1px 1px at 230px 80px, #fff, transparent),
+                              radial-gradient(2px 2px at 300px 150px, rgba(255,255,255,0.7), transparent),
+                              radial-gradient(1px 1px at 370px 50px, #fff, transparent),
+                              radial-gradient(2px 2px at 450px 180px, rgba(255,255,255,0.8), transparent);
+            background-size: 500px 500px;
+            animation: moveStars 100s linear infinite;
+        }
+
+        .stars-layer2 {
+            background-image: radial-gradient(1px 1px at 50px 80px, rgba(255,220,150,0.9), transparent),
+                              radial-gradient(2px 2px at 120px 20px, rgba(150,200,255,0.8), transparent),
+                              radial-gradient(1px 1px at 200px 160px, rgba(255,255,255,0.7), transparent),
+                              radial-gradient(2px 2px at 280px 90px, rgba(255,180,180,0.8), transparent),
+                              radial-gradient(1px 1px at 350px 130px, rgba(200,255,200,0.7), transparent),
+                              radial-gradient(2px 2px at 420px 60px, rgba(255,255,200,0.8), transparent);
+            background-size: 600px 600px;
+            animation: moveStars 150s linear infinite reverse;
+        }
+
+        .stars-layer3 {
+            background-image: radial-gradient(3px 3px at 100px 100px, rgba(255,255,255,0.6), transparent),
+                              radial-gradient(2px 2px at 250px 200px, rgba(200,220,255,0.5), transparent),
+                              radial-gradient(3px 3px at 400px 50px, rgba(255,200,200,0.4), transparent);
+            background-size: 700px 700px;
+            animation: moveStars 200s linear infinite;
+        }
+
+        @keyframes moveStars {
+            from { transform: translateY(0); }
+            to { transform: translateY(-500px); }
+        }
+
+        
+        /* Confetti Animation */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Win highlight for cells */
+        .win-highlight {
+            animation: pulse-win 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse-win {
+            from { transform: scale(1); }
+            to { transform: scale(1.2); }
+        }
+
+        </style>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     
     <style>
@@ -391,6 +489,13 @@
     </style>
 </head>
 <body>
+    <!-- Starfield Background -->
+    <div class="starfield">
+        <div class="stars stars-layer1"></div>
+        <div class="stars stars-layer2"></div>
+        <div class="stars stars-layer3"></div>
+    </div>
+
     <!-- Arcade Sound Effects -->
     <audio id="soundClick" preload="auto">
         <source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg">
@@ -890,17 +995,31 @@
             updateCellVisual(index, currentPlayer);
 
             // Check for win
-            const winner = checkWinner();
-            if (winner) {
+            const result = checkWinner();
+            if (result) {
                 gameActive = false;
+                const winner = result.winner;
+                const pattern = result.pattern;
+
+                // Highlight winning cells immediately
+                highlightWinningCells(pattern);
+                createConfetti();
+                playSound('soundWin');
+
                 // Update Firebase FIRST so other player sees the result
                 if (gameMode === 'online' && gameRef) {
-                    gameRef.update({ 
+                    gameRef.update({
                         board: gameBoard.map(v => v === null ? '' : v),
-                        winner: winner 
+                        winner: winner,
+                        winPattern: pattern
                     });
                 }
-                showWinModal(winner);
+
+                // Delay showing modal so players can see the winning line
+                setTimeout(() => {
+                    clearWinHighlights();
+                    showWinModal(winner);
+                }, 3000);
                 return;
             }
 
@@ -1062,10 +1181,57 @@
             for (const pattern of winPatterns) {
                 const [a, b, c] = pattern;
                 if (gameBoard[a] && gameBoard[a] === gameBoard[b] && gameBoard[a] === gameBoard[c]) {
-                    return gameBoard[a];
+                    return { winner: gameBoard[a], pattern: pattern };
                 }
             }
             return null;
+        }
+
+        // Highlight winning cells
+        function highlightWinningCells(pattern) {
+            pattern.forEach(index => {
+                if (cells[index]) {
+                    const cell = cells[index];
+                    // Make winning cells glow
+                    cell.material.emissive.setHex(0xffd700);
+                    cell.material.emissiveIntensity = 0.5;
+                }
+            });
+        }
+
+        // Clear win highlights
+        function clearWinHighlights() {
+            cells.forEach(cell => {
+                if (cell && cell.material) {
+                    cell.material.emissive.setHex(0x000000);
+                    cell.material.emissiveIntensity = 0;
+                }
+            });
+        }
+
+        // Create confetti effect
+        function createConfetti() {
+            const container = document.createElement('div');
+            container.className = 'confetti-container';
+            document.body.appendChild(container);
+
+            const colors = ['#ff6b6b', '#4ecdc4', '#ffd93d', '#95e1d3', '#f38181', '#aa96da', '#fcbad3'];
+
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.width = (Math.random() * 10 + 5) + 'px';
+                confetti.style.height = (Math.random() * 10 + 5) + 'px';
+                confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                confetti.style.animation = `confetti-fall ${Math.random() * 2 + 2}s ease-out forwards`;
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                container.appendChild(confetti);
+            }
+
+            // Remove after animation
+            setTimeout(() => container.remove(), 5000);
         }
 
         function updateStatus() {
@@ -1229,7 +1395,19 @@
                 if (data.winner && data.winner !== '') {
                     if (gameActive) {
                         gameActive = false;
-                        showWinModal(data.winner);
+
+                        // Show effects for the receiving player too
+                        if (data.winPattern && Array.isArray(data.winPattern)) {
+                            highlightWinningCells(data.winPattern);
+                        }
+                        createConfetti();
+                        playSound('soundWin');
+
+                        // Delay showing modal
+                        setTimeout(() => {
+                            clearWinHighlights();
+                            showWinModal(data.winner);
+                        }, 3000);
                     }
                 } else if (gameBoard.every(cell => cell !== null)) {
                     if (gameActive) {
