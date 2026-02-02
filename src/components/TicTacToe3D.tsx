@@ -82,8 +82,15 @@ export default function TicTacToe3D() {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const cellMeshesRef = useRef<THREE.Mesh[][][]>([])
+  const markerMeshesRef = useRef<THREE.Group[][][]>([])
   const animationIdRef = useRef<number>(0)
   const handleCellClickRef = useRef<(x: number, y: number, z: number, isAI?: boolean) => void>(() => {})
+  
+  // Mouse rotation state
+  const isDraggingRef = useRef(false)
+  const previousMouseRef = useRef({ x: 0, y: 0 })
+  const rotationRef = useRef({ x: 0.5, y: 0 })
+  const autoRotateRef = useRef(true)
 
   const [gameState, setGameState] = useState<GameState>('menu')
   const [gameMode, setGameMode] = useState<GameMode>('local')
@@ -106,6 +113,7 @@ export default function TicTacToe3D() {
   const [waitingForPlayer, setWaitingForPlayer] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
+  const [showingWin, setShowingWin] = useState(false)
 
   const databaseRef = useRef<Database | null>(null)
   const gameRef = useRef<DatabaseReference | null>(null)
@@ -120,6 +128,51 @@ export default function TicTacToe3D() {
     } catch {
       console.log('Firebase already initialized')
     }
+  }, [])
+
+  // Create X marker (cross shape)
+  const createXMarker = useCallback((scene: THREE.Scene, position: THREE.Vector3, isWinning = false) => {
+    const group = new THREE.Group()
+    const color = isWinning ? 0xffff00 : 0x667eea
+    const material = new THREE.MeshPhongMaterial({ 
+      color, 
+      emissive: isWinning ? 0x444400 : 0x000000,
+      emissiveIntensity: isWinning ? 0.5 : 0
+    })
+    
+    // Create two crossed bars
+    const barGeometry = new THREE.BoxGeometry(0.1, 0.6, 0.1)
+    
+    const bar1 = new THREE.Mesh(barGeometry, material)
+    bar1.rotation.z = Math.PI / 4
+    group.add(bar1)
+    
+    const bar2 = new THREE.Mesh(barGeometry, material)
+    bar2.rotation.z = -Math.PI / 4
+    group.add(bar2)
+    
+    group.position.copy(position)
+    scene.add(group)
+    return group
+  }, [])
+
+  // Create O marker (torus/ring shape)
+  const createOMarker = useCallback((scene: THREE.Scene, position: THREE.Vector3, isWinning = false) => {
+    const group = new THREE.Group()
+    const color = isWinning ? 0xffff00 : 0xf093fb
+    const material = new THREE.MeshPhongMaterial({ 
+      color,
+      emissive: isWinning ? 0x444400 : 0x000000,
+      emissiveIntensity: isWinning ? 0.5 : 0
+    })
+    
+    const torusGeometry = new THREE.TorusGeometry(0.25, 0.06, 16, 32)
+    const torus = new THREE.Mesh(torusGeometry, material)
+    group.add(torus)
+    
+    group.position.copy(position)
+    scene.add(group)
+    return group
   }, [])
 
   // Check for winner
@@ -149,24 +202,6 @@ export default function TicTacToe3D() {
     return true
   }, [])
 
-  // Update cell visual
-  const updateCellVisual = useCallback((x: number, y: number, z: number, value: CellValue) => {
-    const mesh = cellMeshesRef.current[x]?.[y]?.[z]
-    if (!mesh) return
-
-    const material = mesh.material as THREE.MeshPhongMaterial
-    if (value === 'X') {
-      material.color.setHex(0x667eea)
-      material.opacity = 0.9
-    } else if (value === 'O') {
-      material.color.setHex(0xf093fb)
-      material.opacity = 0.9
-    } else {
-      material.color.setHex(0x333355)
-      material.opacity = 0.3
-    }
-  }, [])
-
   // Find best move for a player
   const findBestMove = useCallback((boardState: CellValue[][][], player: PlayerSymbol): number[] | null => {
     for (const line of WINNING_LINES) {
@@ -184,7 +219,7 @@ export default function TicTacToe3D() {
 
   // Handle cell click
   const handleCellClick = useCallback((x: number, y: number, z: number, isAI = false) => {
-    if (winner) return
+    if (winner || showingWin) return
     if (board[x][y][z]) return
 
     // Check if it's player's turn in online mode
@@ -212,7 +247,14 @@ export default function TicTacToe3D() {
       const winnerName = result.winner === 'X' ? player1Name : player2Name
       setWinner(winnerName)
       setWinningLine(result.line)
-      setGameState('gameover')
+      setShowingWin(true)
+      setStatusMessage(`${winnerName} wins! 🎉`)
+
+      // Delay before showing game over screen
+      setTimeout(() => {
+        setShowingWin(false)
+        setGameState('gameover')
+      }, 5000)
 
       if (gameMode === 'online' && gameRef.current) {
         set(gameRef.current, {
@@ -232,7 +274,12 @@ export default function TicTacToe3D() {
     // Check for draw
     if (checkDraw(newBoard)) {
       setWinner('Draw')
-      setGameState('gameover')
+      setShowingWin(true)
+      setStatusMessage("It's a draw!")
+      setTimeout(() => {
+        setShowingWin(false)
+        setGameState('gameover')
+      }, 3000)
       return
     }
 
@@ -261,7 +308,7 @@ export default function TicTacToe3D() {
         makeAIMove(newBoard)
       }, 500)
     }
-  }, [board, currentPlayer, winner, gameMode, playerSymbol, player1Name, player2Name, checkWinner, checkDraw])
+  }, [board, currentPlayer, winner, showingWin, gameMode, playerSymbol, player1Name, player2Name, checkWinner, checkDraw])
 
   // Keep ref updated with latest handleCellClick
   useEffect(() => {
@@ -308,30 +355,52 @@ export default function TicTacToe3D() {
     handleCellClickRef.current(move[0], move[1], move[2], true)
   }, [aiDifficulty, findBestMove])
 
-  // Update all cell visuals when board changes
+  // Update markers when board changes
   useEffect(() => {
-    if (gameState !== 'playing') return
+    if (gameState !== 'playing' || !sceneRef.current) return
 
+    const scene = sceneRef.current
+
+    // Clear old markers
     for (let x = 0; x < 3; x++) {
       for (let y = 0; y < 3; y++) {
         for (let z = 0; z < 3; z++) {
-          updateCellVisual(x, y, z, board[x][y][z])
+          const oldMarker = markerMeshesRef.current[x]?.[y]?.[z]
+          if (oldMarker) {
+            scene.remove(oldMarker)
+          }
         }
       }
     }
 
-    // Highlight winning line
-    if (winningLine) {
-      for (const [x, y, z] of winningLine) {
-        const mesh = cellMeshesRef.current[x]?.[y]?.[z]
-        if (mesh) {
-          const material = mesh.material as THREE.MeshPhongMaterial
-          material.emissive = new THREE.Color(0xffff00)
-          material.emissiveIntensity = 0.3
+    // Initialize marker array if needed
+    if (markerMeshesRef.current.length === 0) {
+      markerMeshesRef.current = Array(3).fill(null).map(() =>
+        Array(3).fill(null).map(() =>
+          Array(3).fill(null)
+        )
+      )
+    }
+
+    // Create new markers
+    for (let x = 0; x < 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        for (let z = 0; z < 3; z++) {
+          const value = board[x][y][z]
+          if (value) {
+            const position = new THREE.Vector3(x * 1.5 - 1.5, y * 1.5 - 1.5, z * 1.5 - 1.5)
+            const isWinning = winningLine?.some(([wx, wy, wz]) => wx === x && wy === y && wz === z) || false
+            
+            if (value === 'X') {
+              markerMeshesRef.current[x][y][z] = createXMarker(scene, position, isWinning)
+            } else {
+              markerMeshesRef.current[x][y][z] = createOMarker(scene, position, isWinning)
+            }
+          }
         }
       }
     }
-  }, [board, winningLine, gameState, updateCellVisual])
+  }, [board, winningLine, gameState, createXMarker, createOMarker])
 
   // Create grid lines
   const createGrid = (scene: THREE.Scene) => {
@@ -398,22 +467,25 @@ export default function TicTacToe3D() {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
     directionalLight.position.set(10, 10, 10)
     scene.add(directionalLight)
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4)
+    directionalLight2.position.set(-10, -10, -10)
+    scene.add(directionalLight2)
 
     // Create grid
     createGrid(scene)
 
-    // Create cells
+    // Create invisible clickable cells
     const cells: THREE.Mesh[][][] = []
     for (let x = 0; x < 3; x++) {
       cells[x] = []
       for (let y = 0; y < 3; y++) {
         cells[x][y] = []
         for (let z = 0; z < 3; z++) {
-          const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8)
-          const material = new THREE.MeshPhongMaterial({
-            color: 0x333355,
+          const geometry = new THREE.BoxGeometry(1.2, 1.2, 1.2)
+          const material = new THREE.MeshBasicMaterial({
             transparent: true,
-            opacity: 0.3,
+            opacity: 0,
+            depthWrite: false
           })
           const mesh = new THREE.Mesh(geometry, material)
           mesh.position.set(x * 1.5 - 1.5, y * 1.5 - 1.5, z * 1.5 - 1.5)
@@ -425,14 +497,25 @@ export default function TicTacToe3D() {
     }
     cellMeshesRef.current = cells
 
-    // Animation loop
-    let angle = 0
+    // Reset marker meshes
+    markerMeshesRef.current = []
+
+    // Animation loop with manual rotation
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate)
-      angle += 0.003
-      camera.position.x = 8 * Math.sin(angle)
-      camera.position.z = 8 * Math.cos(angle)
+      
+      // Auto-rotate slowly when not dragging
+      if (autoRotateRef.current && !isDraggingRef.current) {
+        rotationRef.current.y += 0.003
+      }
+      
+      // Update camera position based on rotation
+      const radius = 8
+      camera.position.x = radius * Math.sin(rotationRef.current.y) * Math.cos(rotationRef.current.x)
+      camera.position.y = radius * Math.sin(rotationRef.current.x)
+      camera.position.z = radius * Math.cos(rotationRef.current.y) * Math.cos(rotationRef.current.x)
       camera.lookAt(0, 0, 0)
+      
       renderer.render(scene, camera)
     }
     animate()
@@ -447,11 +530,55 @@ export default function TicTacToe3D() {
     }
     window.addEventListener('resize', handleResize)
 
-    // Handle clicks - use ref to always get latest handler
+    // Mouse rotation controls
+    const handleMouseDown = (event: MouseEvent) => {
+      // Only start drag on left click
+      if (event.button !== 0) return
+      isDraggingRef.current = true
+      autoRotateRef.current = false
+      previousMouseRef.current = { x: event.clientX, y: event.clientY }
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isDraggingRef.current) return
+      
+      const deltaX = event.clientX - previousMouseRef.current.x
+      const deltaY = event.clientY - previousMouseRef.current.y
+      
+      rotationRef.current.y += deltaX * 0.01
+      rotationRef.current.x += deltaY * 0.01
+      
+      // Clamp vertical rotation
+      rotationRef.current.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rotationRef.current.x))
+      
+      previousMouseRef.current = { x: event.clientX, y: event.clientY }
+    }
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false
+    }
+
+    // Handle clicks for cell selection
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
+    let clickStartTime = 0
+    let clickStartPos = { x: 0, y: 0 }
+
+    const handleClickStart = (event: MouseEvent) => {
+      clickStartTime = Date.now()
+      clickStartPos = { x: event.clientX, y: event.clientY }
+    }
 
     const handleClick = (event: MouseEvent) => {
+      // Only register click if it was quick and didn't move much (not a drag)
+      const clickDuration = Date.now() - clickStartTime
+      const clickDistance = Math.sqrt(
+        Math.pow(event.clientX - clickStartPos.x, 2) + 
+        Math.pow(event.clientY - clickStartPos.y, 2)
+      )
+      
+      if (clickDuration > 300 || clickDistance > 10) return
+      
       const rect = container.getBoundingClientRect()
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -462,16 +589,84 @@ export default function TicTacToe3D() {
       if (intersects.length > 0) {
         const mesh = intersects[0].object as THREE.Mesh
         const { x, y, z } = mesh.userData
-        // Use ref to get latest handler
         handleCellClickRef.current(x, y, z)
       }
     }
-    container.addEventListener('click', handleClick)
+
+    container.addEventListener('mousedown', handleMouseDown)
+    container.addEventListener('mousedown', handleClickStart)
+    container.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('mouseup', handleMouseUp)
+    container.addEventListener('mouseup', handleClick)
+    container.addEventListener('mouseleave', handleMouseUp)
+
+    // Touch support
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 1) {
+        isDraggingRef.current = true
+        autoRotateRef.current = false
+        previousMouseRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+        clickStartTime = Date.now()
+        clickStartPos = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+      }
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!isDraggingRef.current || event.touches.length !== 1) return
+      
+      const deltaX = event.touches[0].clientX - previousMouseRef.current.x
+      const deltaY = event.touches[0].clientY - previousMouseRef.current.y
+      
+      rotationRef.current.y += deltaX * 0.01
+      rotationRef.current.x += deltaY * 0.01
+      rotationRef.current.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rotationRef.current.x))
+      
+      previousMouseRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+    }
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      isDraggingRef.current = false
+      
+      // Check for tap (quick touch without much movement)
+      const clickDuration = Date.now() - clickStartTime
+      const touch = event.changedTouches[0]
+      const clickDistance = Math.sqrt(
+        Math.pow(touch.clientX - clickStartPos.x, 2) + 
+        Math.pow(touch.clientY - clickStartPos.y, 2)
+      )
+      
+      if (clickDuration < 300 && clickDistance < 20) {
+        const rect = container.getBoundingClientRect()
+        mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1
+        mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1
+
+        raycaster.setFromCamera(mouse, camera)
+        const intersects = raycaster.intersectObjects(cells.flat(2))
+
+        if (intersects.length > 0) {
+          const mesh = intersects[0].object as THREE.Mesh
+          const { x, y, z } = mesh.userData
+          handleCellClickRef.current(x, y, z)
+        }
+      }
+    }
+
+    container.addEventListener('touchstart', handleTouchStart)
+    container.addEventListener('touchmove', handleTouchMove)
+    container.addEventListener('touchend', handleTouchEnd)
 
     return () => {
       cancelAnimationFrame(animationIdRef.current)
       window.removeEventListener('resize', handleResize)
-      container.removeEventListener('click', handleClick)
+      container.removeEventListener('mousedown', handleMouseDown)
+      container.removeEventListener('mousedown', handleClickStart)
+      container.removeEventListener('mousemove', handleMouseMove)
+      container.removeEventListener('mouseup', handleMouseUp)
+      container.removeEventListener('mouseup', handleClick)
+      container.removeEventListener('mouseleave', handleMouseUp)
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('touchmove', handleTouchMove)
+      container.removeEventListener('touchend', handleTouchEnd)
       if (renderer.domElement.parentNode) {
         container.removeChild(renderer.domElement)
       }
@@ -491,6 +686,9 @@ export default function TicTacToe3D() {
     setCurrentPlayer('X')
     setWinner(null)
     setWinningLine(null)
+    setShowingWin(false)
+    autoRotateRef.current = true
+    rotationRef.current = { x: 0.5, y: 0 }
   }
 
   const startLocalGame = () => {
@@ -568,7 +766,11 @@ export default function TicTacToe3D() {
         if (data.winner) {
           setWinner(data.winner)
           setWinningLine(data.winningLine)
-          setGameState('gameover')
+          setShowingWin(true)
+          setTimeout(() => {
+            setShowingWin(false)
+            setGameState('gameover')
+          }, 5000)
         }
       }
     })
@@ -621,7 +823,11 @@ export default function TicTacToe3D() {
       if (data.winner) {
         setWinner(data.winner)
         setWinningLine(data.winningLine)
-        setGameState('gameover')
+        setShowingWin(true)
+        setTimeout(() => {
+          setShowingWin(false)
+          setGameState('gameover')
+        }, 5000)
       }
     }, { onlyOnce: false })
   }
@@ -868,7 +1074,7 @@ export default function TicTacToe3D() {
             ? 'bg-[#667eea]/30 border-2 border-[#667eea]'
             : 'bg-white/5'
         }`}>
-          <span className="text-[#667eea] font-bold">X</span>
+          <span className="text-[#667eea] font-bold">✕</span>
           <span className="ml-2">{player1Name}</span>
         </div>
         <div className={`px-6 py-3 rounded-xl transition ${
@@ -876,7 +1082,7 @@ export default function TicTacToe3D() {
             ? 'bg-[#f093fb]/30 border-2 border-[#f093fb]'
             : 'bg-white/5'
         }`}>
-          <span className="text-[#f093fb] font-bold">O</span>
+          <span className="text-[#f093fb] font-bold">○</span>
           <span className="ml-2">{player2Name}</span>
         </div>
       </div>
@@ -884,13 +1090,13 @@ export default function TicTacToe3D() {
       {/* Game Container */}
       <div
         ref={containerRef}
-        className="flex-1 w-full cursor-pointer"
-        style={{ minHeight: '400px' }}
+        className="flex-1 w-full cursor-grab active:cursor-grabbing"
+        style={{ minHeight: '400px', touchAction: 'none' }}
       />
 
       {/* Instructions */}
       <div className="p-4 text-center text-gray-400 text-sm">
-        <p>Click on a cell to place your mark. Get 3 in a row in any direction to win!</p>
+        <p>🖱️ Drag to rotate • Click a cell to place your mark • Get 3 in a row to win!</p>
       </div>
     </div>
   )
