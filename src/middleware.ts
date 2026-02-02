@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({
@@ -36,8 +36,13 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
-  await supabase.auth.getUser()
+  // IMPORTANT: Do NOT run supabase.auth.getUser() on the callback route
+  // as it will consume the auth code before the callback handler can use it
+  const { pathname } = request.nextUrl
+  if (!pathname.startsWith('/api/auth/callback')) {
+    // Refresh session if expired - required for Server Components
+    await supabase.auth.getUser()
+  }
 
   return supabaseResponse
 }

@@ -87,14 +87,25 @@ export function useSubscription() {
     const supabase = createClient()
     if (!supabase) return
 
+    // Get the current URL for redirect
+    // Use the deployed URL, not localhost
+    const redirectUrl = process.env.NEXT_PUBLIC_APP_URL 
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`
+      : `${window.location.origin}/api/auth/callback`
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
     if (error) {
       console.error('Sign in error:', error)
+      alert(`Sign in failed: ${error.message}`)
     }
   }, [])
 
