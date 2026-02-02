@@ -35,45 +35,46 @@ const firebaseConfig = {
 }
 
 // Winning combinations for 3D tic-tac-toe
+// Board is [layer][row][col] where layer is vertical (y), row is depth (z), col is horizontal (x)
 const WINNING_LINES = [
-  // Rows on each layer
-  ...Array.from({ length: 3 }, (_, z) =>
-    Array.from({ length: 3 }, (_, y) =>
-      [[0, y, z], [1, y, z], [2, y, z]]
+  // Rows on each layer (horizontal lines on each flat board)
+  ...Array.from({ length: 3 }, (_, layer) =>
+    Array.from({ length: 3 }, (_, row) =>
+      [[layer, row, 0], [layer, row, 1], [layer, row, 2]]
     )
   ).flat(),
-  // Columns on each layer
-  ...Array.from({ length: 3 }, (_, z) =>
-    Array.from({ length: 3 }, (_, x) =>
-      [[x, 0, z], [x, 1, z], [x, 2, z]]
-    )
-  ).flat(),
-  // Verticals (through layers)
-  ...Array.from({ length: 3 }, (_, x) =>
-    Array.from({ length: 3 }, (_, y) =>
-      [[x, y, 0], [x, y, 1], [x, y, 2]]
+  // Columns on each layer (vertical lines on each flat board)
+  ...Array.from({ length: 3 }, (_, layer) =>
+    Array.from({ length: 3 }, (_, col) =>
+      [[layer, 0, col], [layer, 1, col], [layer, 2, col]]
     )
   ).flat(),
   // Diagonals on each layer
-  ...Array.from({ length: 3 }, (_, z) => [
-    [[0, 0, z], [1, 1, z], [2, 2, z]],
-    [[2, 0, z], [1, 1, z], [0, 2, z]]
+  ...Array.from({ length: 3 }, (_, layer) => [
+    [[layer, 0, 0], [layer, 1, 1], [layer, 2, 2]],
+    [[layer, 0, 2], [layer, 1, 1], [layer, 2, 0]]
   ]).flat(),
+  // Vertical columns through all layers
+  ...Array.from({ length: 3 }, (_, row) =>
+    Array.from({ length: 3 }, (_, col) =>
+      [[0, row, col], [1, row, col], [2, row, col]]
+    )
+  ).flat(),
   // Diagonals through layers (front-back)
-  ...Array.from({ length: 3 }, (_, x) => [
-    [[x, 0, 0], [x, 1, 1], [x, 2, 2]],
-    [[x, 2, 0], [x, 1, 1], [x, 0, 2]]
+  ...Array.from({ length: 3 }, (_, col) => [
+    [[0, 0, col], [1, 1, col], [2, 2, col]],
+    [[0, 2, col], [1, 1, col], [2, 0, col]]
   ]).flat(),
   // Diagonals through layers (left-right)
-  ...Array.from({ length: 3 }, (_, y) => [
-    [[0, y, 0], [1, y, 1], [2, y, 2]],
-    [[2, y, 0], [1, y, 1], [0, y, 2]]
+  ...Array.from({ length: 3 }, (_, row) => [
+    [[0, row, 0], [1, row, 1], [2, row, 2]],
+    [[0, row, 2], [1, row, 1], [2, row, 0]]
   ]).flat(),
-  // Space diagonals
+  // Space diagonals (corner to corner through center)
   [[0, 0, 0], [1, 1, 1], [2, 2, 2]],
-  [[2, 0, 0], [1, 1, 1], [0, 2, 2]],
+  [[0, 0, 2], [1, 1, 1], [2, 2, 0]],
   [[0, 2, 0], [1, 1, 1], [2, 0, 2]],
-  [[2, 2, 0], [1, 1, 1], [0, 0, 2]]
+  [[0, 2, 2], [1, 1, 1], [2, 0, 0]]
 ]
 
 export default function TicTacToe3D() {
@@ -83,14 +84,14 @@ export default function TicTacToe3D() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const cellMeshesRef = useRef<THREE.Mesh[][][]>([])
   const markerMeshesRef = useRef<THREE.Group[][][]>([])
+  const gridGroupRef = useRef<THREE.Group | null>(null)
   const animationIdRef = useRef<number>(0)
-  const handleCellClickRef = useRef<(x: number, y: number, z: number, isAI?: boolean) => void>(() => {})
+  const handleCellClickRef = useRef<(layer: number, row: number, col: number, isAI?: boolean) => void>(() => {})
   
   // Mouse rotation state
   const isDraggingRef = useRef(false)
   const previousMouseRef = useRef({ x: 0, y: 0 })
-  const rotationRef = useRef({ x: 0.5, y: 0 })
-  const autoRotateRef = useRef(true)
+  const rotationRef = useRef({ x: 0, y: 0 })
 
   const [gameState, setGameState] = useState<GameState>('menu')
   const [gameMode, setGameMode] = useState<GameMode>('local')
@@ -130,8 +131,8 @@ export default function TicTacToe3D() {
     }
   }, [])
 
-  // Create X marker (cross shape)
-  const createXMarker = useCallback((scene: THREE.Scene, position: THREE.Vector3, isWinning = false) => {
+  // Create X marker (cross shape) - lies flat on the layer
+  const createXMarker = useCallback((position: THREE.Vector3, isWinning = false) => {
     const group = new THREE.Group()
     const color = isWinning ? 0xffff00 : 0x667eea
     const material = new THREE.MeshPhongMaterial({ 
@@ -140,24 +141,23 @@ export default function TicTacToe3D() {
       emissiveIntensity: isWinning ? 0.5 : 0
     })
     
-    // Create two crossed bars
-    const barGeometry = new THREE.BoxGeometry(0.1, 0.6, 0.1)
+    // Create two crossed bars lying flat
+    const barGeometry = new THREE.BoxGeometry(0.6, 0.08, 0.12)
     
     const bar1 = new THREE.Mesh(barGeometry, material)
-    bar1.rotation.z = Math.PI / 4
+    bar1.rotation.y = Math.PI / 4
     group.add(bar1)
     
     const bar2 = new THREE.Mesh(barGeometry, material)
-    bar2.rotation.z = -Math.PI / 4
+    bar2.rotation.y = -Math.PI / 4
     group.add(bar2)
     
     group.position.copy(position)
-    scene.add(group)
     return group
   }, [])
 
-  // Create O marker (torus/ring shape)
-  const createOMarker = useCallback((scene: THREE.Scene, position: THREE.Vector3, isWinning = false) => {
+  // Create O marker (torus/ring shape) - lies flat on the layer
+  const createOMarker = useCallback((position: THREE.Vector3, isWinning = false) => {
     const group = new THREE.Group()
     const color = isWinning ? 0xffff00 : 0xf093fb
     const material = new THREE.MeshPhongMaterial({ 
@@ -166,12 +166,12 @@ export default function TicTacToe3D() {
       emissiveIntensity: isWinning ? 0.5 : 0
     })
     
-    const torusGeometry = new THREE.TorusGeometry(0.25, 0.06, 16, 32)
+    const torusGeometry = new THREE.TorusGeometry(0.22, 0.05, 16, 32)
     const torus = new THREE.Mesh(torusGeometry, material)
+    torus.rotation.x = Math.PI / 2 // Lie flat
     group.add(torus)
     
     group.position.copy(position)
-    scene.add(group)
     return group
   }, [])
 
@@ -192,10 +192,10 @@ export default function TicTacToe3D() {
 
   // Check for draw
   const checkDraw = useCallback((boardState: CellValue[][][]): boolean => {
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          if (!boardState[x][y][z]) return false
+    for (let layer = 0; layer < 3; layer++) {
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          if (!boardState[layer][row][col]) return false
         }
       }
     }
@@ -205,7 +205,7 @@ export default function TicTacToe3D() {
   // Find best move for a player
   const findBestMove = useCallback((boardState: CellValue[][][], player: PlayerSymbol): number[] | null => {
     for (const line of WINNING_LINES) {
-      const values = line.map(([x, y, z]) => boardState[x][y][z])
+      const values = line.map(([layer, row, col]) => boardState[layer][row][col])
       const playerCount = values.filter(v => v === player).length
       const emptyCount = values.filter(v => v === null).length
 
@@ -218,9 +218,9 @@ export default function TicTacToe3D() {
   }, [])
 
   // Handle cell click
-  const handleCellClick = useCallback((x: number, y: number, z: number, isAI = false) => {
+  const handleCellClick = useCallback((layer: number, row: number, col: number, isAI = false) => {
     if (winner || showingWin) return
-    if (board[x][y][z]) return
+    if (board[layer][row][col]) return
 
     // Check if it's player's turn in online mode
     if (gameMode === 'online' && !isAI) {
@@ -231,10 +231,10 @@ export default function TicTacToe3D() {
       }
     }
 
-    const newBoard = board.map((layer, lx) =>
-      layer.map((row, ly) =>
-        row.map((cell, lz) =>
-          lx === x && ly === y && lz === z ? currentPlayer : cell
+    const newBoard = board.map((layerArr, l) =>
+      layerArr.map((rowArr, r) =>
+        rowArr.map((cell, c) =>
+          l === layer && r === row && c === col ? currentPlayer : cell
         )
       )
     )
@@ -265,7 +265,7 @@ export default function TicTacToe3D() {
           player2Joined: true,
           winner: winnerName,
           winningLine: result.line,
-          lastMove: [x, y, z]
+          lastMove: [layer, row, col]
         })
       }
       return
@@ -298,7 +298,7 @@ export default function TicTacToe3D() {
         player2Joined: true,
         winner: null,
         winningLine: null,
-        lastMove: [x, y, z]
+        lastMove: [layer, row, col]
       })
     }
 
@@ -318,11 +318,11 @@ export default function TicTacToe3D() {
   // AI Move
   const makeAIMove = useCallback((boardState: CellValue[][][]) => {
     const emptyCells: number[][] = []
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          if (!boardState[x][y][z]) {
-            emptyCells.push([x, y, z])
+    for (let layer = 0; layer < 3; layer++) {
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          if (!boardState[layer][row][col]) {
+            emptyCells.push([layer, row, col])
           }
         }
       }
@@ -357,17 +357,17 @@ export default function TicTacToe3D() {
 
   // Update markers when board changes
   useEffect(() => {
-    if (gameState !== 'playing' || !sceneRef.current) return
+    if (gameState !== 'playing' || !gridGroupRef.current) return
 
-    const scene = sceneRef.current
+    const gridGroup = gridGroupRef.current
 
     // Clear old markers
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          const oldMarker = markerMeshesRef.current[x]?.[y]?.[z]
+    for (let layer = 0; layer < 3; layer++) {
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const oldMarker = markerMeshesRef.current[layer]?.[row]?.[col]
           if (oldMarker) {
-            scene.remove(oldMarker)
+            gridGroup.remove(oldMarker)
           }
         }
       }
@@ -383,57 +383,32 @@ export default function TicTacToe3D() {
     }
 
     // Create new markers
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          const value = board[x][y][z]
+    // Layer spacing: layers are stacked vertically with good separation
+    const layerSpacing = 2.0
+    const cellSpacing = 1.2
+    
+    for (let layer = 0; layer < 3; layer++) {
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const value = board[layer][row][col]
           if (value) {
-            const position = new THREE.Vector3(x * 1.5 - 1.5, y * 1.5 - 1.5, z * 1.5 - 1.5)
-            const isWinning = winningLine?.some(([wx, wy, wz]) => wx === x && wy === y && wz === z) || false
+            const x = (col - 1) * cellSpacing
+            const y = (layer - 1) * layerSpacing
+            const z = (row - 1) * cellSpacing
+            const position = new THREE.Vector3(x, y, z)
+            const isWinning = winningLine?.some(([wl, wr, wc]) => wl === layer && wr === row && wc === col) || false
             
             if (value === 'X') {
-              markerMeshesRef.current[x][y][z] = createXMarker(scene, position, isWinning)
+              markerMeshesRef.current[layer][row][col] = createXMarker(position, isWinning)
             } else {
-              markerMeshesRef.current[x][y][z] = createOMarker(scene, position, isWinning)
+              markerMeshesRef.current[layer][row][col] = createOMarker(position, isWinning)
             }
+            gridGroup.add(markerMeshesRef.current[layer][row][col])
           }
         }
       }
     }
   }, [board, winningLine, gameState, createXMarker, createOMarker])
-
-  // Create grid lines
-  const createGrid = (scene: THREE.Scene) => {
-    const material = new THREE.LineBasicMaterial({ color: 0x4a4a6a, transparent: true, opacity: 0.5 })
-
-    for (let i = 0; i < 4; i++) {
-      for (let j = 0; j < 4; j++) {
-        // Vertical lines
-        const vPoints = [
-          new THREE.Vector3(i * 1.5 - 2.25, -2.25, j * 1.5 - 2.25),
-          new THREE.Vector3(i * 1.5 - 2.25, 2.25, j * 1.5 - 2.25)
-        ]
-        const vGeometry = new THREE.BufferGeometry().setFromPoints(vPoints)
-        scene.add(new THREE.Line(vGeometry, material))
-
-        // Horizontal lines (x direction)
-        const hxPoints = [
-          new THREE.Vector3(-2.25, i * 1.5 - 2.25, j * 1.5 - 2.25),
-          new THREE.Vector3(2.25, i * 1.5 - 2.25, j * 1.5 - 2.25)
-        ]
-        const hxGeometry = new THREE.BufferGeometry().setFromPoints(hxPoints)
-        scene.add(new THREE.Line(hxGeometry, material))
-
-        // Horizontal lines (z direction)
-        const hzPoints = [
-          new THREE.Vector3(i * 1.5 - 2.25, j * 1.5 - 2.25, -2.25),
-          new THREE.Vector3(i * 1.5 - 2.25, j * 1.5 - 2.25, 2.25)
-        ]
-        const hzGeometry = new THREE.BufferGeometry().setFromPoints(hzPoints)
-        scene.add(new THREE.Line(hzGeometry, material))
-      }
-    }
-  }
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -448,9 +423,9 @@ export default function TicTacToe3D() {
     scene.background = new THREE.Color(0x1a1a2e)
     sceneRef.current = scene
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000)
-    camera.position.set(6, 6, 6)
+    // Camera - positioned to look down at the layers from an angle
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000)
+    camera.position.set(0, 8, 8)
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
 
@@ -465,33 +440,99 @@ export default function TicTacToe3D() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
     scene.add(ambientLight)
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(10, 10, 10)
+    directionalLight.position.set(5, 10, 5)
     scene.add(directionalLight)
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4)
-    directionalLight2.position.set(-10, -10, -10)
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3)
+    directionalLight2.position.set(-5, -5, -5)
     scene.add(directionalLight2)
 
-    // Create grid
-    createGrid(scene)
+    // Create a group for the entire grid (for rotation)
+    const gridGroup = new THREE.Group()
+    scene.add(gridGroup)
+    gridGroupRef.current = gridGroup
+
+    // Layer spacing
+    const layerSpacing = 2.0
+    const cellSpacing = 1.2
+    const gridSize = cellSpacing * 2
+
+    // Create 3 horizontal layers
+    const layerMaterial = new THREE.LineBasicMaterial({ color: 0x4a5568, transparent: true, opacity: 0.6 })
+    const layerColors = [0x667eea, 0x48bb78, 0xf093fb] // Different colors for each layer
+
+    for (let layer = 0; layer < 3; layer++) {
+      const y = (layer - 1) * layerSpacing
+      
+      // Create grid lines for this layer
+      const lineMaterial = new THREE.LineBasicMaterial({ 
+        color: layerColors[layer], 
+        transparent: true, 
+        opacity: 0.4 
+      })
+
+      // Horizontal lines (along X)
+      for (let i = 0; i <= 3; i++) {
+        const z = (i - 1.5) * cellSpacing
+        const points = [
+          new THREE.Vector3(-gridSize / 2 - cellSpacing / 2, y, z),
+          new THREE.Vector3(gridSize / 2 + cellSpacing / 2, y, z)
+        ]
+        const geometry = new THREE.BufferGeometry().setFromPoints(points)
+        gridGroup.add(new THREE.Line(geometry, lineMaterial))
+      }
+
+      // Vertical lines (along Z)
+      for (let i = 0; i <= 3; i++) {
+        const x = (i - 1.5) * cellSpacing
+        const points = [
+          new THREE.Vector3(x, y, -gridSize / 2 - cellSpacing / 2),
+          new THREE.Vector3(x, y, gridSize / 2 + cellSpacing / 2)
+        ]
+        const geometry = new THREE.BufferGeometry().setFromPoints(points)
+        gridGroup.add(new THREE.Line(geometry, lineMaterial))
+      }
+
+      // Add layer label
+      // (Optional: could add text sprites here)
+    }
+
+    // Create vertical connecting lines between layers
+    const connectMaterial = new THREE.LineBasicMaterial({ color: 0x4a5568, transparent: true, opacity: 0.2 })
+    for (let i = 0; i <= 3; i++) {
+      for (let j = 0; j <= 3; j++) {
+        const x = (i - 1.5) * cellSpacing
+        const z = (j - 1.5) * cellSpacing
+        const points = [
+          new THREE.Vector3(x, -layerSpacing, z),
+          new THREE.Vector3(x, layerSpacing, z)
+        ]
+        const geometry = new THREE.BufferGeometry().setFromPoints(points)
+        gridGroup.add(new THREE.Line(geometry, connectMaterial))
+      }
+    }
 
     // Create invisible clickable cells
     const cells: THREE.Mesh[][][] = []
-    for (let x = 0; x < 3; x++) {
-      cells[x] = []
-      for (let y = 0; y < 3; y++) {
-        cells[x][y] = []
-        for (let z = 0; z < 3; z++) {
-          const geometry = new THREE.BoxGeometry(1.2, 1.2, 1.2)
+    for (let layer = 0; layer < 3; layer++) {
+      cells[layer] = []
+      for (let row = 0; row < 3; row++) {
+        cells[layer][row] = []
+        for (let col = 0; col < 3; col++) {
+          // Flat clickable area for each cell
+          const geometry = new THREE.BoxGeometry(cellSpacing * 0.9, 0.3, cellSpacing * 0.9)
           const material = new THREE.MeshBasicMaterial({
             transparent: true,
             opacity: 0,
             depthWrite: false
           })
           const mesh = new THREE.Mesh(geometry, material)
-          mesh.position.set(x * 1.5 - 1.5, y * 1.5 - 1.5, z * 1.5 - 1.5)
-          mesh.userData = { x, y, z }
-          scene.add(mesh)
-          cells[x][y][z] = mesh
+          const x = (col - 1) * cellSpacing
+          const y = (layer - 1) * layerSpacing
+          const z = (row - 1) * cellSpacing
+          mesh.position.set(x, y, z)
+          mesh.userData = { layer, row, col }
+          gridGroup.add(mesh)
+          cells[layer][row][col] = mesh
         }
       }
     }
@@ -500,21 +541,13 @@ export default function TicTacToe3D() {
     // Reset marker meshes
     markerMeshesRef.current = []
 
-    // Animation loop with manual rotation
+    // Animation loop
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate)
       
-      // Auto-rotate slowly when not dragging
-      if (autoRotateRef.current && !isDraggingRef.current) {
-        rotationRef.current.y += 0.003
-      }
-      
-      // Update camera position based on rotation
-      const radius = 8
-      camera.position.x = radius * Math.sin(rotationRef.current.y) * Math.cos(rotationRef.current.x)
-      camera.position.y = radius * Math.sin(rotationRef.current.x)
-      camera.position.z = radius * Math.cos(rotationRef.current.y) * Math.cos(rotationRef.current.x)
-      camera.lookAt(0, 0, 0)
+      // Apply rotation to grid group
+      gridGroup.rotation.y = rotationRef.current.y
+      gridGroup.rotation.x = rotationRef.current.x
       
       renderer.render(scene, camera)
     }
@@ -532,10 +565,8 @@ export default function TicTacToe3D() {
 
     // Mouse rotation controls
     const handleMouseDown = (event: MouseEvent) => {
-      // Only start drag on left click
       if (event.button !== 0) return
       isDraggingRef.current = true
-      autoRotateRef.current = false
       previousMouseRef.current = { x: event.clientX, y: event.clientY }
     }
 
@@ -548,8 +579,8 @@ export default function TicTacToe3D() {
       rotationRef.current.y += deltaX * 0.01
       rotationRef.current.x += deltaY * 0.01
       
-      // Clamp vertical rotation
-      rotationRef.current.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rotationRef.current.x))
+      // Limit vertical rotation to keep layers visible
+      rotationRef.current.x = Math.max(-0.5, Math.min(0.8, rotationRef.current.x))
       
       previousMouseRef.current = { x: event.clientX, y: event.clientY }
     }
@@ -570,7 +601,7 @@ export default function TicTacToe3D() {
     }
 
     const handleClick = (event: MouseEvent) => {
-      // Only register click if it was quick and didn't move much (not a drag)
+      // Only register click if it was quick and didn't move much
       const clickDuration = Date.now() - clickStartTime
       const clickDistance = Math.sqrt(
         Math.pow(event.clientX - clickStartPos.x, 2) + 
@@ -584,12 +615,13 @@ export default function TicTacToe3D() {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
       raycaster.setFromCamera(mouse, camera)
-      const intersects = raycaster.intersectObjects(cells.flat(2))
+      const allCells = cells.flat(2)
+      const intersects = raycaster.intersectObjects(allCells)
 
       if (intersects.length > 0) {
         const mesh = intersects[0].object as THREE.Mesh
-        const { x, y, z } = mesh.userData
-        handleCellClickRef.current(x, y, z)
+        const { layer, row, col } = mesh.userData
+        handleCellClickRef.current(layer, row, col)
       }
     }
 
@@ -604,7 +636,6 @@ export default function TicTacToe3D() {
     const handleTouchStart = (event: TouchEvent) => {
       if (event.touches.length === 1) {
         isDraggingRef.current = true
-        autoRotateRef.current = false
         previousMouseRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }
         clickStartTime = Date.now()
         clickStartPos = { x: event.touches[0].clientX, y: event.touches[0].clientY }
@@ -619,7 +650,7 @@ export default function TicTacToe3D() {
       
       rotationRef.current.y += deltaX * 0.01
       rotationRef.current.x += deltaY * 0.01
-      rotationRef.current.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rotationRef.current.x))
+      rotationRef.current.x = Math.max(-0.5, Math.min(0.8, rotationRef.current.x))
       
       previousMouseRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }
     }
@@ -627,7 +658,6 @@ export default function TicTacToe3D() {
     const handleTouchEnd = (event: TouchEvent) => {
       isDraggingRef.current = false
       
-      // Check for tap (quick touch without much movement)
       const clickDuration = Date.now() - clickStartTime
       const touch = event.changedTouches[0]
       const clickDistance = Math.sqrt(
@@ -641,12 +671,13 @@ export default function TicTacToe3D() {
         mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1
 
         raycaster.setFromCamera(mouse, camera)
-        const intersects = raycaster.intersectObjects(cells.flat(2))
+        const allCells = cells.flat(2)
+        const intersects = raycaster.intersectObjects(allCells)
 
         if (intersects.length > 0) {
           const mesh = intersects[0].object as THREE.Mesh
-          const { x, y, z } = mesh.userData
-          handleCellClickRef.current(x, y, z)
+          const { layer, row, col } = mesh.userData
+          handleCellClickRef.current(layer, row, col)
         }
       }
     }
@@ -687,8 +718,7 @@ export default function TicTacToe3D() {
     setWinner(null)
     setWinningLine(null)
     setShowingWin(false)
-    autoRotateRef.current = true
-    rotationRef.current = { x: 0.5, y: 0 }
+    rotationRef.current = { x: 0, y: 0 }
   }
 
   const startLocalGame = () => {
@@ -696,7 +726,7 @@ export default function TicTacToe3D() {
     setGameMode('local')
     setPlayer1Name('Player 1')
     setPlayer2Name('Player 2')
-    setStatusMessage("Player 1's turn")
+    setStatusMessage("Player 1's turn (X)")
     setGameState('playing')
   }
 
@@ -705,7 +735,7 @@ export default function TicTacToe3D() {
     setGameMode('ai')
     setPlayer1Name('You')
     setPlayer2Name('AI')
-    setStatusMessage('Your turn')
+    setStatusMessage('Your turn (X)')
     setGameState('playing')
   }
 
@@ -802,7 +832,6 @@ export default function TicTacToe3D() {
       }
 
       if (!data.player2Joined) {
-        // Join the game
         set(gameReference, {
           ...data,
           player2Name: onlinePlayerName,
@@ -834,7 +863,7 @@ export default function TicTacToe3D() {
 
   const playAgain = () => {
     resetBoard()
-    setStatusMessage(`${player1Name}'s turn`)
+    setStatusMessage(`${player1Name}'s turn (X)`)
     setGameState('playing')
 
     if (gameMode === 'online' && gameRef.current) {
@@ -1064,17 +1093,17 @@ export default function TicTacToe3D() {
           </p>
           <p className="font-semibold">{statusMessage}</p>
         </div>
-        <div className="w-20" /> {/* Spacer */}
+        <div className="w-20" />
       </div>
 
       {/* Player Info */}
-      <div className="flex justify-center gap-8 px-4 mb-4">
+      <div className="flex justify-center gap-8 px-4 mb-2">
         <div className={`px-6 py-3 rounded-xl transition ${
           currentPlayer === 'X'
             ? 'bg-[#667eea]/30 border-2 border-[#667eea]'
             : 'bg-white/5'
         }`}>
-          <span className="text-[#667eea] font-bold">✕</span>
+          <span className="text-[#667eea] font-bold text-xl">✕</span>
           <span className="ml-2">{player1Name}</span>
         </div>
         <div className={`px-6 py-3 rounded-xl transition ${
@@ -1082,9 +1111,16 @@ export default function TicTacToe3D() {
             ? 'bg-[#f093fb]/30 border-2 border-[#f093fb]'
             : 'bg-white/5'
         }`}>
-          <span className="text-[#f093fb] font-bold">○</span>
+          <span className="text-[#f093fb] font-bold text-xl">○</span>
           <span className="ml-2">{player2Name}</span>
         </div>
+      </div>
+
+      {/* Layer indicators */}
+      <div className="flex justify-center gap-4 px-4 mb-2 text-sm">
+        <span className="text-[#667eea]">● Top Layer</span>
+        <span className="text-[#48bb78]">● Middle Layer</span>
+        <span className="text-[#f093fb]">● Bottom Layer</span>
       </div>
 
       {/* Game Container */}
@@ -1096,7 +1132,7 @@ export default function TicTacToe3D() {
 
       {/* Instructions */}
       <div className="p-4 text-center text-gray-400 text-sm">
-        <p>🖱️ Drag to rotate • Click a cell to place your mark • Get 3 in a row to win!</p>
+        <p>🖱️ Drag to rotate view • Click a cell to place your mark • Get 3 in a row to win!</p>
       </div>
     </div>
   )
