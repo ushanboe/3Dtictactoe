@@ -1010,16 +1010,16 @@ export default function TicTacToe3D() {
               </>
             ) : (
               <div className="text-center">
-                <p className="text-gray-400 mb-4">Subscribe to play online with friends!</p>
+                {user ? (<p className="text-gray-400 mb-4">Choose a plan to unlock online multiplayer!</p>) : (<p className="text-gray-400 mb-4">Sign in first, then subscribe to play online!</p>)}
                 <div className="flex gap-3 justify-center">
                   <button
-                    onClick={() => checkout('monthly')}
+                    onClick={() => user ? checkout('monthly') : signIn()}
                     className="px-6 py-3 bg-gradient-to-r from-[#667eea] to-[#764ba2] rounded-xl font-semibold hover:opacity-90 transition"
                   >
                     $1.99/mo
                   </button>
                   <button
-                    onClick={() => checkout('annual')}
+                    onClick={() => user ? checkout('annual') : signIn()}
                     className="px-6 py-3 bg-gradient-to-r from-[#f093fb] to-[#f5576c] rounded-xl font-semibold hover:opacity-90 transition"
                   >
                     $10/year
