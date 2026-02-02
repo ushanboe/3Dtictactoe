@@ -83,12 +83,13 @@ export default function TicTacToe3D() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const cellMeshesRef = useRef<THREE.Mesh[][][]>([])
   const animationIdRef = useRef<number>(0)
+  const handleCellClickRef = useRef<(x: number, y: number, z: number, isAI?: boolean) => void>(() => {})
 
   const [gameState, setGameState] = useState<GameState>('menu')
   const [gameMode, setGameMode] = useState<GameMode>('local')
-  const [board, setBoard] = useState<CellValue[][][]>(() => 
-    Array(3).fill(null).map(() => 
-      Array(3).fill(null).map(() => 
+  const [board, setBoard] = useState<CellValue[][][]>(() =>
+    Array(3).fill(null).map(() =>
+      Array(3).fill(null).map(() =>
         Array(3).fill(null)
       )
     )
@@ -120,6 +121,250 @@ export default function TicTacToe3D() {
       console.log('Firebase already initialized')
     }
   }, [])
+
+  // Check for winner
+  const checkWinner = useCallback((boardState: CellValue[][][]): { winner: PlayerSymbol | null; line: number[][] | null } => {
+    for (const line of WINNING_LINES) {
+      const [a, b, c] = line
+      const valA = boardState[a[0]][a[1]][a[2]]
+      const valB = boardState[b[0]][b[1]][b[2]]
+      const valC = boardState[c[0]][c[1]][c[2]]
+
+      if (valA && valA === valB && valB === valC) {
+        return { winner: valA, line }
+      }
+    }
+    return { winner: null, line: null }
+  }, [])
+
+  // Check for draw
+  const checkDraw = useCallback((boardState: CellValue[][][]): boolean => {
+    for (let x = 0; x < 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        for (let z = 0; z < 3; z++) {
+          if (!boardState[x][y][z]) return false
+        }
+      }
+    }
+    return true
+  }, [])
+
+  // Update cell visual
+  const updateCellVisual = useCallback((x: number, y: number, z: number, value: CellValue) => {
+    const mesh = cellMeshesRef.current[x]?.[y]?.[z]
+    if (!mesh) return
+
+    const material = mesh.material as THREE.MeshPhongMaterial
+    if (value === 'X') {
+      material.color.setHex(0x667eea)
+      material.opacity = 0.9
+    } else if (value === 'O') {
+      material.color.setHex(0xf093fb)
+      material.opacity = 0.9
+    } else {
+      material.color.setHex(0x333355)
+      material.opacity = 0.3
+    }
+  }, [])
+
+  // Find best move for a player
+  const findBestMove = useCallback((boardState: CellValue[][][], player: PlayerSymbol): number[] | null => {
+    for (const line of WINNING_LINES) {
+      const values = line.map(([x, y, z]) => boardState[x][y][z])
+      const playerCount = values.filter(v => v === player).length
+      const emptyCount = values.filter(v => v === null).length
+
+      if (playerCount === 2 && emptyCount === 1) {
+        const emptyIndex = values.findIndex(v => v === null)
+        return line[emptyIndex]
+      }
+    }
+    return null
+  }, [])
+
+  // Handle cell click
+  const handleCellClick = useCallback((x: number, y: number, z: number, isAI = false) => {
+    if (winner) return
+    if (board[x][y][z]) return
+
+    // Check if it's player's turn in online mode
+    if (gameMode === 'online' && !isAI) {
+      const isMyTurn = currentPlayer === playerSymbol
+      if (!isMyTurn) {
+        setStatusMessage("Wait for your opponent's move")
+        return
+      }
+    }
+
+    const newBoard = board.map((layer, lx) =>
+      layer.map((row, ly) =>
+        row.map((cell, lz) =>
+          lx === x && ly === y && lz === z ? currentPlayer : cell
+        )
+      )
+    )
+
+    setBoard(newBoard)
+
+    // Check for winner
+    const result = checkWinner(newBoard)
+    if (result.winner) {
+      const winnerName = result.winner === 'X' ? player1Name : player2Name
+      setWinner(winnerName)
+      setWinningLine(result.line)
+      setGameState('gameover')
+
+      if (gameMode === 'online' && gameRef.current) {
+        set(gameRef.current, {
+          board: newBoard,
+          currentPlayer: currentPlayer === 'X' ? 'O' : 'X',
+          player1Name,
+          player2Name,
+          player2Joined: true,
+          winner: winnerName,
+          winningLine: result.line,
+          lastMove: [x, y, z]
+        })
+      }
+      return
+    }
+
+    // Check for draw
+    if (checkDraw(newBoard)) {
+      setWinner('Draw')
+      setGameState('gameover')
+      return
+    }
+
+    // Switch player
+    const nextPlayer = currentPlayer === 'X' ? 'O' : 'X'
+    setCurrentPlayer(nextPlayer)
+    setStatusMessage(`${nextPlayer === 'X' ? player1Name : player2Name}'s turn`)
+
+    // Update online game
+    if (gameMode === 'online' && gameRef.current) {
+      set(gameRef.current, {
+        board: newBoard,
+        currentPlayer: nextPlayer,
+        player1Name,
+        player2Name,
+        player2Joined: true,
+        winner: null,
+        winningLine: null,
+        lastMove: [x, y, z]
+      })
+    }
+
+    // AI move
+    if (gameMode === 'ai' && nextPlayer === 'O' && !isAI) {
+      setTimeout(() => {
+        makeAIMove(newBoard)
+      }, 500)
+    }
+  }, [board, currentPlayer, winner, gameMode, playerSymbol, player1Name, player2Name, checkWinner, checkDraw])
+
+  // Keep ref updated with latest handleCellClick
+  useEffect(() => {
+    handleCellClickRef.current = handleCellClick
+  }, [handleCellClick])
+
+  // AI Move
+  const makeAIMove = useCallback((boardState: CellValue[][][]) => {
+    const emptyCells: number[][] = []
+    for (let x = 0; x < 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        for (let z = 0; z < 3; z++) {
+          if (!boardState[x][y][z]) {
+            emptyCells.push([x, y, z])
+          }
+        }
+      }
+    }
+
+    if (emptyCells.length === 0) return
+
+    let move: number[] | null = null
+
+    if (aiDifficulty === 'hard') {
+      // Try to win
+      move = findBestMove(boardState, 'O')
+      // Block player
+      if (!move) move = findBestMove(boardState, 'X')
+      // Take center if available
+      if (!move && !boardState[1][1][1]) move = [1, 1, 1]
+    } else if (aiDifficulty === 'medium') {
+      // 50% chance to play smart
+      if (Math.random() > 0.5) {
+        move = findBestMove(boardState, 'O')
+        if (!move) move = findBestMove(boardState, 'X')
+      }
+    }
+
+    // Random move as fallback
+    if (!move) {
+      move = emptyCells[Math.floor(Math.random() * emptyCells.length)]
+    }
+
+    handleCellClickRef.current(move[0], move[1], move[2], true)
+  }, [aiDifficulty, findBestMove])
+
+  // Update all cell visuals when board changes
+  useEffect(() => {
+    if (gameState !== 'playing') return
+
+    for (let x = 0; x < 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        for (let z = 0; z < 3; z++) {
+          updateCellVisual(x, y, z, board[x][y][z])
+        }
+      }
+    }
+
+    // Highlight winning line
+    if (winningLine) {
+      for (const [x, y, z] of winningLine) {
+        const mesh = cellMeshesRef.current[x]?.[y]?.[z]
+        if (mesh) {
+          const material = mesh.material as THREE.MeshPhongMaterial
+          material.emissive = new THREE.Color(0xffff00)
+          material.emissiveIntensity = 0.3
+        }
+      }
+    }
+  }, [board, winningLine, gameState, updateCellVisual])
+
+  // Create grid lines
+  const createGrid = (scene: THREE.Scene) => {
+    const material = new THREE.LineBasicMaterial({ color: 0x4a4a6a, transparent: true, opacity: 0.5 })
+
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        // Vertical lines
+        const vPoints = [
+          new THREE.Vector3(i * 1.5 - 2.25, -2.25, j * 1.5 - 2.25),
+          new THREE.Vector3(i * 1.5 - 2.25, 2.25, j * 1.5 - 2.25)
+        ]
+        const vGeometry = new THREE.BufferGeometry().setFromPoints(vPoints)
+        scene.add(new THREE.Line(vGeometry, material))
+
+        // Horizontal lines (x direction)
+        const hxPoints = [
+          new THREE.Vector3(-2.25, i * 1.5 - 2.25, j * 1.5 - 2.25),
+          new THREE.Vector3(2.25, i * 1.5 - 2.25, j * 1.5 - 2.25)
+        ]
+        const hxGeometry = new THREE.BufferGeometry().setFromPoints(hxPoints)
+        scene.add(new THREE.Line(hxGeometry, material))
+
+        // Horizontal lines (z direction)
+        const hzPoints = [
+          new THREE.Vector3(i * 1.5 - 2.25, j * 1.5 - 2.25, -2.25),
+          new THREE.Vector3(i * 1.5 - 2.25, j * 1.5 - 2.25, 2.25)
+        ]
+        const hzGeometry = new THREE.BufferGeometry().setFromPoints(hzPoints)
+        scene.add(new THREE.Line(hzGeometry, material))
+      }
+    }
+  }
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -202,7 +447,7 @@ export default function TicTacToe3D() {
     }
     window.addEventListener('resize', handleResize)
 
-    // Handle clicks
+    // Handle clicks - use ref to always get latest handler
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
 
@@ -217,7 +462,8 @@ export default function TicTacToe3D() {
       if (intersects.length > 0) {
         const mesh = intersects[0].object as THREE.Mesh
         const { x, y, z } = mesh.userData
-        handleCellClick(x, y, z)
+        // Use ref to get latest handler
+        handleCellClickRef.current(x, y, z)
       }
     }
     container.addEventListener('click', handleClick)
@@ -233,273 +479,69 @@ export default function TicTacToe3D() {
     }
   }, [gameState])
 
-
-  // Create grid lines
-  const createGrid = (scene: THREE.Scene) => {
-    const material = new THREE.LineBasicMaterial({ color: 0x4a4a6a, transparent: true, opacity: 0.5 })
-
-    for (let i = 0; i < 4; i++) {
-      for (let j = 0; j < 4; j++) {
-        // Vertical lines
-        const vPoints = [
-          new THREE.Vector3(i * 1.5 - 2.25, -2.25, j * 1.5 - 2.25),
-          new THREE.Vector3(i * 1.5 - 2.25, 2.25, j * 1.5 - 2.25)
-        ]
-        const vGeometry = new THREE.BufferGeometry().setFromPoints(vPoints)
-        scene.add(new THREE.Line(vGeometry, material))
-
-        // Horizontal lines (x direction)
-        const hxPoints = [
-          new THREE.Vector3(-2.25, i * 1.5 - 2.25, j * 1.5 - 2.25),
-          new THREE.Vector3(2.25, i * 1.5 - 2.25, j * 1.5 - 2.25)
-        ]
-        const hxGeometry = new THREE.BufferGeometry().setFromPoints(hxPoints)
-        scene.add(new THREE.Line(hxGeometry, material))
-
-        // Horizontal lines (z direction)
-        const hzPoints = [
-          new THREE.Vector3(i * 1.5 - 2.25, j * 1.5 - 2.25, -2.25),
-          new THREE.Vector3(i * 1.5 - 2.25, j * 1.5 - 2.25, 2.25)
-        ]
-        const hzGeometry = new THREE.BufferGeometry().setFromPoints(hzPoints)
-        scene.add(new THREE.Line(hzGeometry, material))
-      }
-    }
-  }
-
-  // Check for winner
-  const checkWinner = useCallback((boardState: CellValue[][][]): { winner: PlayerSymbol | null; line: number[][] | null } => {
-    for (const line of WINNING_LINES) {
-      const [a, b, c] = line
-      const valA = boardState[a[0]][a[1]][a[2]]
-      const valB = boardState[b[0]][b[1]][b[2]]
-      const valC = boardState[c[0]][c[1]][c[2]]
-
-      if (valA && valA === valB && valB === valC) {
-        return { winner: valA, line }
-      }
-    }
-    return { winner: null, line: null }
-  }, [])
-
-  // Check for draw
-  const checkDraw = useCallback((boardState: CellValue[][][]): boolean => {
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          if (!boardState[x][y][z]) return false
-        }
-      }
-    }
-    return true
-  }, [])
-
-  // Update cell visuals
-  const updateCellVisual = useCallback((x: number, y: number, z: number, value: CellValue) => {
-    const mesh = cellMeshesRef.current[x]?.[y]?.[z]
-    if (!mesh) return
-
-    const material = mesh.material as THREE.MeshPhongMaterial
-    if (value === 'X') {
-      material.color.setHex(0x667eea)
-      material.opacity = 0.9
-    } else if (value === 'O') {
-      material.color.setHex(0xf093fb)
-      material.opacity = 0.9
-    } else {
-      material.color.setHex(0x333355)
-      material.opacity = 0.3
-    }
-  }, [])
-
-  // Update all cell visuals when board changes
-  useEffect(() => {
-    if (gameState !== 'playing') return
-
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          updateCellVisual(x, y, z, board[x][y][z])
-        }
-      }
-    }
-
-    // Highlight winning line
-    if (winningLine) {
-      for (const [x, y, z] of winningLine) {
-        const mesh = cellMeshesRef.current[x]?.[y]?.[z]
-        if (mesh) {
-          const material = mesh.material as THREE.MeshPhongMaterial
-          material.emissive = new THREE.Color(0xffff00)
-          material.emissiveIntensity = 0.3
-        }
-      }
-    }
-  }, [board, winningLine, gameState, updateCellVisual])
-
-  // AI Move
-  const makeAIMove = useCallback((boardState: CellValue[][][]) => {
-    const emptyCells: number[][] = []
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        for (let z = 0; z < 3; z++) {
-          if (!boardState[x][y][z]) {
-            emptyCells.push([x, y, z])
-          }
-        }
-      }
-    }
-
-    if (emptyCells.length === 0) return
-
-    let move: number[]
-
-    if (aiDifficulty === 'easy') {
-      // Random move
-      move = emptyCells[Math.floor(Math.random() * emptyCells.length)]
-    } else if (aiDifficulty === 'medium') {
-      // Try to win, then block, then random
-      move = findBestMove(boardState, 'O') || findBestMove(boardState, 'X') || emptyCells[Math.floor(Math.random() * emptyCells.length)]
-    } else {
-      // Hard: prioritize center, then strategic positions
-      if (!boardState[1][1][1]) {
-        move = [1, 1, 1]
-      } else {
-        move = findBestMove(boardState, 'O') || findBestMove(boardState, 'X') || emptyCells[Math.floor(Math.random() * emptyCells.length)]
-      }
-    }
-
-    setTimeout(() => {
-      handleCellClick(move[0], move[1], move[2], true)
-    }, 500)
-  }, [aiDifficulty])
-
-  // Find best move for a player
-  const findBestMove = (boardState: CellValue[][][], player: PlayerSymbol): number[] | null => {
-    for (const line of WINNING_LINES) {
-      const values = line.map(([x, y, z]) => boardState[x][y][z])
-      const playerCount = values.filter(v => v === player).length
-      const emptyCount = values.filter(v => v === null).length
-
-      if (playerCount === 2 && emptyCount === 1) {
-        const emptyIndex = values.findIndex(v => v === null)
-        return line[emptyIndex]
-      }
-    }
-    return null
-  }
-
-
-  // Handle cell click
-  const handleCellClick = useCallback((x: number, y: number, z: number, isAI = false) => {
-    if (winner) return
-    if (board[x][y][z]) return
-
-    // Check if it's player's turn in online mode
-    if (gameMode === 'online' && !isAI) {
-      const isMyTurn = currentPlayer === playerSymbol
-      if (!isMyTurn) {
-        setStatusMessage("Wait for your opponent's move")
-        return
-      }
-    }
-
-    const newBoard = board.map((layer, lx) =>
-      layer.map((row, ly) =>
-        row.map((cell, lz) =>
-          lx === x && ly === y && lz === z ? currentPlayer : cell
+  // Game functions
+  const resetBoard = () => {
+    setBoard(
+      Array(3).fill(null).map(() =>
+        Array(3).fill(null).map(() =>
+          Array(3).fill(null)
         )
       )
     )
+    setCurrentPlayer('X')
+    setWinner(null)
+    setWinningLine(null)
+  }
 
-    setBoard(newBoard)
+  const startLocalGame = () => {
+    resetBoard()
+    setGameMode('local')
+    setPlayer1Name('Player 1')
+    setPlayer2Name('Player 2')
+    setStatusMessage("Player 1's turn")
+    setGameState('playing')
+  }
 
-    // Check for winner
-    const result = checkWinner(newBoard)
-    if (result.winner) {
-      const winnerName = result.winner === 'X' ? player1Name : player2Name
-      setWinner(winnerName)
-      setWinningLine(result.line)
-      setGameState('gameover')
+  const startAIGame = () => {
+    resetBoard()
+    setGameMode('ai')
+    setPlayer1Name('You')
+    setPlayer2Name('AI')
+    setStatusMessage('Your turn')
+    setGameState('playing')
+  }
 
-      if (gameMode === 'online' && gameRef.current) {
-        set(gameRef.current, {
-          board: newBoard,
-          currentPlayer: currentPlayer === 'X' ? 'O' : 'X',
-          player1Name,
-          player2Name,
-          player2Joined: true,
-          winner: winnerName,
-          winningLine: result.line,
-          lastMove: [x, y, z]
-        })
-      }
-      return
-    }
-
-    // Check for draw
-    if (checkDraw(newBoard)) {
-      setWinner('Draw')
-      setGameState('gameover')
-      return
-    }
-
-    // Switch player
-    const nextPlayer = currentPlayer === 'X' ? 'O' : 'X'
-    setCurrentPlayer(nextPlayer)
-
-    // Update online game
-    if (gameMode === 'online' && gameRef.current) {
-      set(gameRef.current, {
-        board: newBoard,
-        currentPlayer: nextPlayer,
-        player1Name,
-        player2Name,
-        player2Joined: true,
-        winner: null,
-        winningLine: null,
-        lastMove: [x, y, z]
-      })
-    }
-
-    // AI move
-    if (gameMode === 'ai' && nextPlayer === 'O' && !isAI) {
-      makeAIMove(newBoard)
-    }
-
-    // Update status
-    const nextName = nextPlayer === 'X' ? player1Name : player2Name
-    setStatusMessage(`${nextName}'s turn`)
-  }, [board, currentPlayer, winner, gameMode, playerSymbol, player1Name, player2Name, checkWinner, checkDraw, makeAIMove])
-
-  // Generate game code
   const generateGameCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
   }
 
-  // Create online room
   const createRoom = () => {
-    if (!databaseRef.current) return
-    if (!isSubscribed) {
-      setStatusMessage('Subscribe to play online!')
+    if (!onlinePlayerName.trim()) {
+      setStatusMessage('Please enter your name')
+      return
+    }
+    if (!databaseRef.current) {
+      setStatusMessage('Connection error')
       return
     }
 
     const code = generateGameCode()
     setGameCode(code)
-    setGameMode('online')
     setPlayerSymbol('X')
-    setPlayer1Name(onlinePlayerName || 'Player 1')
+    setPlayer1Name(onlinePlayerName)
     setWaitingForPlayer(true)
-    setStatusMessage('Waiting for opponent to join...')
 
     const gameReference = ref(databaseRef.current, `games/${code}`)
     gameRef.current = gameReference
 
     const initialData: GameData = {
-      board: Array(3).fill(null).map(() => Array(3).fill(null).map(() => Array(3).fill(null))),
+      board: Array(3).fill(null).map(() =>
+        Array(3).fill(null).map(() =>
+          Array(3).fill(null)
+        )
+      ),
       currentPlayer: 'X',
-      player1Name: onlinePlayerName || 'Player 1',
+      player1Name: onlinePlayerName,
       player2Name: '',
       player2Joined: false,
       winner: null,
@@ -509,18 +551,20 @@ export default function TicTacToe3D() {
 
     set(gameReference, initialData)
 
-    // Listen for changes
     onValue(gameReference, (snapshot) => {
       const data = snapshot.val() as GameData
       if (data) {
-        if (data.player2Joined && waitingForPlayer) {
-          setWaitingForPlayer(false)
-          setPlayer2Name(data.player2Name)
-          setGameState('playing')
-          setStatusMessage(`${data.player1Name}'s turn`)
-        }
         setBoard(data.board)
         setCurrentPlayer(data.currentPlayer)
+        setPlayer2Name(data.player2Name || 'Waiting...')
+        
+        if (data.player2Joined && waitingForPlayer) {
+          setWaitingForPlayer(false)
+          setGameMode('online')
+          setStatusMessage(`${data.currentPlayer === 'X' ? data.player1Name : data.player2Name}'s turn`)
+          setGameState('playing')
+        }
+
         if (data.winner) {
           setWinner(data.winner)
           setWinningLine(data.winningLine)
@@ -530,138 +574,114 @@ export default function TicTacToe3D() {
     })
   }
 
-  // Join online room
   const joinRoom = () => {
-    if (!databaseRef.current) return
-    if (!isSubscribed) {
-      setStatusMessage('Subscribe to play online!')
+    if (!onlinePlayerName.trim()) {
+      setStatusMessage('Please enter your name')
       return
     }
-    if (!joinCode) {
+    if (!joinCode.trim()) {
       setStatusMessage('Please enter a game code')
       return
     }
+    if (!databaseRef.current) {
+      setStatusMessage('Connection error')
+      return
+    }
 
-    const gameReference = ref(databaseRef.current, `games/${joinCode.toUpperCase()}`)
+    const gameReference = ref(databaseRef.current, `games/${joinCode}`)
     gameRef.current = gameReference
 
     onValue(gameReference, (snapshot) => {
       const data = snapshot.val() as GameData
       if (!data) {
         setStatusMessage('Game not found')
+        off(gameReference)
         return
       }
 
       if (!data.player2Joined) {
         // Join the game
-        setGameMode('online')
-        setPlayerSymbol('O')
-        setPlayer1Name(data.player1Name)
-        setPlayer2Name(onlinePlayerName || 'Player 2')
-        setGameCode(joinCode.toUpperCase())
-        setGameState('playing')
-        setStatusMessage(`${data.player1Name}'s turn`)
-
         set(gameReference, {
           ...data,
-          player2Name: onlinePlayerName || 'Player 2',
+          player2Name: onlinePlayerName,
           player2Joined: true
         })
-      } else {
-        // Already in game, sync state
-        setBoard(data.board)
-        setCurrentPlayer(data.currentPlayer)
-        setPlayer1Name(data.player1Name)
-        setPlayer2Name(data.player2Name)
-        if (data.winner) {
-          setWinner(data.winner)
-          setWinningLine(data.winningLine)
-          setGameState('gameover')
-        }
+        setPlayerSymbol('O')
+        setGameCode(joinCode)
+      }
+
+      setBoard(data.board)
+      setCurrentPlayer(data.currentPlayer)
+      setPlayer1Name(data.player1Name)
+      setPlayer2Name(data.player2Joined ? data.player2Name : onlinePlayerName)
+      setGameMode('online')
+      setStatusMessage(`${data.currentPlayer === 'X' ? data.player1Name : (data.player2Name || onlinePlayerName)}'s turn`)
+      setGameState('playing')
+
+      if (data.winner) {
+        setWinner(data.winner)
+        setWinningLine(data.winningLine)
+        setGameState('gameover')
       }
     }, { onlyOnce: false })
   }
 
-
-  // Start local game
-  const startLocalGame = () => {
-    setGameMode('local')
-    setPlayer1Name('Player 1')
-    setPlayer2Name('Player 2')
-    resetGame()
+  const playAgain = () => {
+    resetBoard()
+    setStatusMessage(`${player1Name}'s turn`)
     setGameState('playing')
-    setStatusMessage("Player 1's turn (X)")
-  }
 
-  // Start AI game
-  const startAIGame = () => {
-    setGameMode('ai')
-    setPlayer1Name('You')
-    setPlayer2Name('AI')
-    resetGame()
-    setGameState('playing')
-    setStatusMessage('Your turn (X)')
-  }
-
-  // Reset game
-  const resetGame = () => {
-    setBoard(Array(3).fill(null).map(() => Array(3).fill(null).map(() => Array(3).fill(null))))
-    setCurrentPlayer('X')
-    setWinner(null)
-    setWinningLine(null)
-  }
-
-  // Back to menu
-  const backToMenu = () => {
-    // Clean up online game
-    if (gameMode === 'online' && gameRef.current && databaseRef.current) {
-      off(gameRef.current)
-      if (gameCode) {
-        remove(ref(databaseRef.current, `games/${gameCode}`))
-      }
+    if (gameMode === 'online' && gameRef.current) {
+      set(gameRef.current, {
+        board: Array(3).fill(null).map(() =>
+          Array(3).fill(null).map(() =>
+            Array(3).fill(null)
+          )
+        ),
+        currentPlayer: 'X',
+        player1Name,
+        player2Name,
+        player2Joined: true,
+        winner: null,
+        winningLine: null,
+        lastMove: null
+      })
     }
+  }
 
+  const backToMenu = () => {
+    if (gameRef.current) {
+      remove(gameRef.current)
+      off(gameRef.current)
+      gameRef.current = null
+    }
+    resetBoard()
     setGameState('menu')
-    setGameMode('local')
+    setWaitingForPlayer(false)
     setGameCode('')
     setJoinCode('')
-    setWaitingForPlayer(false)
-    resetGame()
+    setStatusMessage('')
   }
-
-  // Play again
-  const playAgain = () => {
-    if (gameMode === 'online') {
-      backToMenu()
-    } else {
-      resetGame()
-      setGameState('playing')
-      setStatusMessage(gameMode === 'ai' ? 'Your turn (X)' : "Player 1's turn (X)")
-    }
-  }
-
 
   // Render Menu
   if (gameState === 'menu') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex flex-col items-center justify-center p-4">
-        <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#667eea] via-[#764ba2] to-[#f093fb] bg-clip-text text-transparent mb-2">
+      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex flex-col items-center justify-center p-4 text-white">
+        <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-[#667eea] to-[#f093fb] bg-clip-text text-transparent">
           3D Tic-Tac-Toe
         </h1>
-        <p className="text-gray-400 mb-8">Challenge your spatial thinking</p>
+        <p className="text-gray-400 mb-8">Play in three dimensions!</p>
 
-        {/* Auth Status */}
-        <div className="mb-6 text-center">
+        {/* Auth Section */}
+        <div className="mb-6">
           {loading ? (
             <p className="text-gray-400">Loading...</p>
           ) : user ? (
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-green-400">✓ Signed in as {user.email}</p>
-              {isSubscribed ? (
-                <p className="text-purple-400">✓ Premium subscriber</p>
-              ) : (
-                <p className="text-yellow-400">Free account</p>
-              )}
+            <div className="text-center">
+              <p className="text-sm text-gray-400 mb-2">
+                Signed in as {user.email}
+                {isSubscribed && <span className="ml-2 text-green-400">⭐ Premium</span>}
+              </p>
               <button
                 onClick={signOut}
                 className="text-sm text-gray-400 hover:text-white transition"
@@ -789,18 +809,17 @@ export default function TicTacToe3D() {
     )
   }
 
-
   // Render Game Over
   if (gameState === 'gameover') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex flex-col items-center justify-center p-4 text-white">
         <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md border border-white/10 shadow-2xl text-center">
           <h2 className="text-3xl font-bold mb-4">
             {winner === 'Draw' ? "It's a Draw!" : `${winner} Wins!`}
           </h2>
           <p className="text-gray-400 mb-6">
-            {winner === 'Draw' 
-              ? 'Great game! No one could claim victory.' 
+            {winner === 'Draw'
+              ? 'Great game! No one could claim victory.'
               : 'Congratulations on the victory!'}
           </p>
           <div className="flex gap-4 justify-center">
@@ -824,7 +843,7 @@ export default function TicTacToe3D() {
 
   // Render Playing State
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex flex-col text-white">
       {/* Header */}
       <div className="p-4 flex justify-between items-center">
         <button
@@ -845,16 +864,16 @@ export default function TicTacToe3D() {
       {/* Player Info */}
       <div className="flex justify-center gap-8 px-4 mb-4">
         <div className={`px-6 py-3 rounded-xl transition ${
-          currentPlayer === 'X' 
-            ? 'bg-[#667eea]/30 border-2 border-[#667eea]' 
+          currentPlayer === 'X'
+            ? 'bg-[#667eea]/30 border-2 border-[#667eea]'
             : 'bg-white/5'
         }`}>
           <span className="text-[#667eea] font-bold">X</span>
           <span className="ml-2">{player1Name}</span>
         </div>
         <div className={`px-6 py-3 rounded-xl transition ${
-          currentPlayer === 'O' 
-            ? 'bg-[#f093fb]/30 border-2 border-[#f093fb]' 
+          currentPlayer === 'O'
+            ? 'bg-[#f093fb]/30 border-2 border-[#f093fb]'
             : 'bg-white/5'
         }`}>
           <span className="text-[#f093fb] font-bold">O</span>
@@ -863,8 +882,8 @@ export default function TicTacToe3D() {
       </div>
 
       {/* Game Container */}
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="flex-1 w-full cursor-pointer"
         style={{ minHeight: '400px' }}
       />
