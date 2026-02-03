@@ -19,93 +19,126 @@ export function useSubscription() {
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
-
-    // Handle case when Supabase client is not available (build time)
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-
-    async function getSubscription() {
-      const client = createClient()
-      if (!client) {
-        setLoading(false)
-        return
-      }
-
+    let isMounted = true
+    
+    async function initialize() {
       try {
-        const { data: { user } } = await client.auth.getUser()
-        setUser(user)
+        const supabase = createClient()
+        
+        // Handle case when Supabase client is not available
+        if (!supabase) {
+          console.log('Supabase client not available')
+          if (isMounted) {
+            setLoading(false)
+            setError('Supabase not configured')
+          }
+          return
+        }
 
-        if (user) {
-          const { data, error } = await client
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.log('Auth error (expected if not logged in):', userError.message)
+        }
+        
+        if (isMounted) {
+          setUser(user ?? null)
+        }
+
+        // If user exists, get their subscription
+        if (user && isMounted) {
+          const { data, error: subError } = await supabase
             .from('subscriptions')
             .select('*')
             .eq('user_id', user.id)
             .single()
 
-          if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching subscription:', error)
+          if (subError && subError.code !== 'PGRST116') {
+            console.error('Error fetching subscription:', subError)
           }
-          setSubscription(data)
+          
+          if (isMounted) {
+            setSubscription(data ?? null)
+          }
         }
-      } catch (error) {
-        console.error('Error:', error)
-      } finally {
-        setLoading(false)
+
+        // Set up auth state listener
+        const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            console.log('Auth state changed:', event)
+            if (!isMounted) return
+            
+            setUser(session?.user ?? null)
+            
+            if (session?.user) {
+              const { data } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .single()
+              setSubscription(data ?? null)
+            } else {
+              setSubscription(null)
+            }
+          }
+        )
+
+        if (isMounted) {
+          setLoading(false)
+        }
+
+        return () => {
+          authListener.unsubscribe()
+        }
+      } catch (err) {
+        console.error('Initialization error:', err)
+        if (isMounted) {
+          setLoading(false)
+          setError(err instanceof Error ? err.message : 'Unknown error')
+        }
       }
     }
 
-    getSubscription()
-
-    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-        const client = createClient()
-        if (session?.user && client) {
-          const { data } = await client
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single()
-          setSubscription(data)
-        } else {
-          setSubscription(null)
-        }
-      }
-    )
+    initialize()
 
     return () => {
-      authSubscription.unsubscribe()
+      isMounted = false
     }
   }, [])
 
   const signIn = useCallback(async () => {
     const supabase = createClient()
-    if (!supabase) return
+    if (!supabase) {
+      alert('Authentication not available. Please try again later.')
+      return
+    }
 
-    // Get the current URL for redirect
-    // Use the deployed URL, not localhost
-    const redirectUrl = process.env.NEXT_PUBLIC_APP_URL 
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`
-      : `${window.location.origin}/api/auth/callback`
+    try {
+      const redirectUrl = `${window.location.origin}/api/auth/callback`
+      console.log('Signing in with redirect:', redirectUrl)
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
-      },
-    })
-    if (error) {
-      console.error('Sign in error:', error)
-      alert(`Sign in failed: ${error.message}`)
+      })
+      
+      if (error) {
+        console.error('Sign in error:', error)
+        alert(`Sign in failed: ${error.message}`)
+      }
+    } catch (err) {
+      console.error('Sign in exception:', err)
+      alert('Sign in failed. Please try again.')
     }
   }, [])
 
@@ -113,12 +146,16 @@ export function useSubscription() {
     const supabase = createClient()
     if (!supabase) return
 
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Sign out error:', error)
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Sign out error:', error)
+      }
+      setUser(null)
+      setSubscription(null)
+    } catch (err) {
+      console.error('Sign out exception:', err)
     }
-    setUser(null)
-    setSubscription(null)
   }, [])
 
   const checkout = useCallback(async (plan: 'monthly' | 'annual') => {
@@ -137,13 +174,13 @@ export function useSubscription() {
         console.error('Checkout error:', data.error)
         alert(data.error || 'Failed to create checkout session')
       }
-    } catch (error) {
-      console.error('Checkout error:', error)
+    } catch (err) {
+      console.error('Checkout error:', err)
       alert('Failed to start checkout')
     }
   }, [])
 
   const isSubscribed = subscription?.status === 'active' || subscription?.status === 'trialing'
 
-  return { subscription, loading, user, isSubscribed, signIn, signOut, checkout }
+  return { subscription, loading, user, isSubscribed, signIn, signOut, checkout, error }
 }
