@@ -38,6 +38,27 @@ export function useSubscription() {
           return
         }
 
+        // Check if there's a code in the URL (fallback for PKCE issues)
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search)
+          const code = urlParams.get('code')
+          
+          if (code) {
+            console.log('Found auth code in URL, attempting client-side exchange')
+            // Try to exchange the code client-side
+            const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+            
+            if (exchangeError) {
+              console.error('Client-side code exchange failed:', exchangeError)
+            } else if (data.session) {
+              console.log('Client-side code exchange successful')
+            }
+            
+            // Clean up the URL
+            window.history.replaceState({}, '', window.location.pathname)
+          }
+        }
+
         // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         
@@ -147,12 +168,18 @@ export function useSubscription() {
     if (!supabase) return
 
     try {
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut()
       if (error) {
         console.error('Sign out error:', error)
       }
+      
+      // Clear local state
       setUser(null)
       setSubscription(null)
+      
+      // Force reload to clear any cached state
+      window.location.href = '/'
     } catch (err) {
       console.error('Sign out exception:', err)
     }

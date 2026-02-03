@@ -25,6 +25,15 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies()
+    
+    // Log all cookies for debugging
+    const allCookies = cookieStore.getAll()
+    console.log('Available cookies:', allCookies.map(c => c.name))
+    
+    // Check for code verifier in cookies
+    const codeVerifierCookie = allCookies.find(c => c.name.includes('code_verifier') || c.name.includes('pkce'))
+    console.log('Code verifier cookie found:', codeVerifierCookie?.name)
+    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,25 +49,32 @@ export async function GET(request: NextRequest) {
               )
             } catch (error) {
               // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing sessions.
             }
           },
         },
       }
     )
 
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!exchangeError) {
+    if (!exchangeError && data.session) {
+      console.log('Session created successfully for user:', data.session.user.email)
       return NextResponse.redirect(`${baseUrl}${next}`)
     }
     
     console.error('Code exchange error:', exchangeError)
+    
+    // If PKCE error, redirect to home with a flag to handle client-side
+    if (exchangeError?.message?.includes('code verifier')) {
+      // Redirect to home page with the code, let client handle it
+      return NextResponse.redirect(`${baseUrl}/?code=${code}`)
+    }
+    
     return NextResponse.redirect(
-      `${baseUrl}/auth/auth-code-error?error=${encodeURIComponent(exchangeError.message)}`
+      `${baseUrl}/auth/auth-code-error?error=${encodeURIComponent(exchangeError?.message || 'Unknown error')}`
     )
   }
 
-  // No code provided
-  return NextResponse.redirect(`${baseUrl}/auth/auth-code-error?error=no_code`)
+  // No code provided - just redirect home
+  return NextResponse.redirect(baseUrl)
 }
