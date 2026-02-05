@@ -108,6 +108,12 @@ export default function TicTacToe3D() {
       )
     )
   )
+  const boardRef = useRef<CellValue[][][]>(board)
+
+  // Keep boardRef in sync with board state
+  useEffect(() => {
+    boardRef.current = board
+  }, [board])
   const [currentPlayer, setCurrentPlayer] = useState<PlayerSymbol>('X')
   const [playerSymbol, setPlayerSymbol] = useState<PlayerSymbol>('X')
   const [player1Name, setPlayer1Name] = useState('Player 1')
@@ -230,26 +236,28 @@ export default function TicTacToe3D() {
   // Handle cell click
   const handleCellClick = useCallback((layer: number, row: number, col: number, isAI = false) => {
     console.log('[DEBUG] handleCellClick called:', { layer, row, col, isAI })
+    const currentBoard = boardRef.current
     console.log('[DEBUG] State:', { 
       winner, 
       showingWin, 
       gameMode: gameModeRef.current, 
       playerSymbol: playerSymbolRef.current,
       currentPlayer: currentPlayerRef.current,
-      boardExists: !!board,
-      boardLayerExists: !!board?.[layer],
-      boardRowExists: !!board?.[layer]?.[row]
+      boardExists: !!currentBoard,
+      boardLayerExists: !!currentBoard?.[layer],
+      boardRowExists: !!currentBoard?.[layer]?.[row],
+      cellValue: currentBoard?.[layer]?.[row]?.[col]
     })
     
     if (winner || showingWin) {
       console.log('[DEBUG] Returning early: winner or showingWin')
       return
     }
-    if (!board || !board[layer] || !board[layer][row]) {
+    if (!currentBoard || !currentBoard[layer] || !currentBoard[layer][row]) {
       console.log('[DEBUG] Board not properly initialized')
       return
     }
-    if (board[layer][row][col]) {
+    if (currentBoard[layer][row][col]) {
       console.log('[DEBUG] Cell already occupied')
       return
     }
@@ -269,7 +277,7 @@ export default function TicTacToe3D() {
       }
     }
 
-    const newBoard = board.map((layerArr, l) =>
+    const newBoard = currentBoard.map((layerArr, l) =>
       layerArr.map((rowArr, r) =>
         rowArr.map((cell, c) =>
           l === layer && r === row && c === col ? currentPlayer : cell
