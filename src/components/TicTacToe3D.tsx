@@ -113,6 +113,8 @@ export default function TicTacToe3D() {
   const [onlinePlayerName, setOnlinePlayerName] = useState('')
   const [waitingForPlayer, setWaitingForPlayer] = useState(false)
   const waitingForPlayerRef = useRef(false)
+  const gameModeRef = useRef<GameMode>('local')
+  const playerSymbolRef = useRef<PlayerSymbol>('X')
   const [statusMessage, setStatusMessage] = useState('')
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [showingWin, setShowingWin] = useState(false)
@@ -224,8 +226,8 @@ export default function TicTacToe3D() {
     if (board[layer][row][col]) return
 
     // Check if it's player's turn in online mode
-    if (gameMode === 'online' && !isAI) {
-      const isMyTurn = currentPlayer === playerSymbol
+    if (gameModeRef.current === 'online' && !isAI) {
+      const isMyTurn = currentPlayer === playerSymbolRef.current
       if (!isMyTurn) {
         setStatusMessage("Wait for your opponent's move")
         return
@@ -257,7 +259,7 @@ export default function TicTacToe3D() {
         setGameState('gameover')
       }, 5000)
 
-      if (gameMode === 'online' && gameRef.current) {
+      if (gameModeRef.current === 'online' && gameRef.current) {
         set(gameRef.current, {
           board: newBoard,
           currentPlayer: currentPlayer === 'X' ? 'O' : 'X',
@@ -290,7 +292,7 @@ export default function TicTacToe3D() {
     setStatusMessage(`${nextPlayer === 'X' ? player1Name : player2Name}'s turn`)
 
     // Update online game
-    if (gameMode === 'online' && gameRef.current) {
+    if (gameModeRef.current === 'online' && gameRef.current) {
       set(gameRef.current, {
         board: newBoard,
         currentPlayer: nextPlayer,
@@ -725,6 +727,8 @@ export default function TicTacToe3D() {
   const startLocalGame = () => {
     resetBoard()
     setGameMode('local')
+    gameModeRef.current = 'local'
+    playerSymbolRef.current = 'X'
     setPlayer1Name('Player 1')
     setPlayer2Name('Player 2')
     setStatusMessage("Player 1's turn (X)")
@@ -734,6 +738,8 @@ export default function TicTacToe3D() {
   const startAIGame = () => {
     resetBoard()
     setGameMode('ai')
+    gameModeRef.current = 'ai'
+    playerSymbolRef.current = 'X'
     setPlayer1Name('You')
     setPlayer2Name('AI')
     setStatusMessage('Your turn (X)')
@@ -757,6 +763,7 @@ export default function TicTacToe3D() {
     const code = generateGameCode()
     setGameCode(code)
     setPlayerSymbol('X')
+    playerSymbolRef.current = 'X'
     setPlayer1Name(onlinePlayerName)
     setWaitingForPlayer(true)
     waitingForPlayerRef.current = true
@@ -792,6 +799,7 @@ export default function TicTacToe3D() {
           setWaitingForPlayer(false)
           waitingForPlayerRef.current = false
           setGameMode('online')
+          gameModeRef.current = 'online'
           setStatusMessage(`${data.currentPlayer === 'X' ? data.player1Name : data.player2Name}'s turn`)
           setGameState('playing')
         }
@@ -841,6 +849,7 @@ export default function TicTacToe3D() {
           player2Joined: true
         })
         setPlayerSymbol('O')
+        playerSymbolRef.current = 'O'
         setGameCode(joinCode)
       }
 
@@ -849,6 +858,7 @@ export default function TicTacToe3D() {
       setPlayer1Name(data.player1Name)
       setPlayer2Name(data.player2Joined ? data.player2Name : onlinePlayerName)
       setGameMode('online')
+      gameModeRef.current = 'online'
       setStatusMessage(`${data.currentPlayer === 'X' ? data.player1Name : (data.player2Name || onlinePlayerName)}'s turn`)
       setGameState('playing')
 
@@ -869,7 +879,7 @@ export default function TicTacToe3D() {
     setStatusMessage(`${player1Name}'s turn (X)`)
     setGameState('playing')
 
-    if (gameMode === 'online' && gameRef.current) {
+    if (gameModeRef.current === 'online' && gameRef.current) {
       set(gameRef.current, {
         board: Array(3).fill(null).map(() =>
           Array(3).fill(null).map(() =>
@@ -897,6 +907,8 @@ export default function TicTacToe3D() {
     setGameState('menu')
     setWaitingForPlayer(false)
     waitingForPlayerRef.current = false
+    gameModeRef.current = 'local'
+    playerSymbolRef.current = 'X'
     setGameCode('')
     setJoinCode('')
     setStatusMessage('')
