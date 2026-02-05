@@ -223,13 +223,41 @@ export default function TicTacToe3D() {
 
   // Handle cell click
   const handleCellClick = useCallback((layer: number, row: number, col: number, isAI = false) => {
-    if (winner || showingWin) return
-    if (board[layer][row][col]) return
+    console.log('[DEBUG] handleCellClick called:', { layer, row, col, isAI })
+    console.log('[DEBUG] State:', { 
+      winner, 
+      showingWin, 
+      gameMode: gameModeRef.current, 
+      playerSymbol: playerSymbolRef.current,
+      currentPlayer: currentPlayerRef.current,
+      boardExists: !!board,
+      boardLayerExists: !!board?.[layer],
+      boardRowExists: !!board?.[layer]?.[row]
+    })
+    
+    if (winner || showingWin) {
+      console.log('[DEBUG] Returning early: winner or showingWin')
+      return
+    }
+    if (!board || !board[layer] || !board[layer][row]) {
+      console.log('[DEBUG] Board not properly initialized')
+      return
+    }
+    if (board[layer][row][col]) {
+      console.log('[DEBUG] Cell already occupied')
+      return
+    }
 
     // Check if it's player's turn in online mode
     if (gameModeRef.current === 'online' && !isAI) {
       const isMyTurn = currentPlayerRef.current === playerSymbolRef.current
+      console.log('[DEBUG] Online turn check:', { 
+        currentPlayerRef: currentPlayerRef.current, 
+        playerSymbolRef: playerSymbolRef.current, 
+        isMyTurn 
+      })
       if (!isMyTurn) {
+        console.log('[DEBUG] Not my turn, returning')
         setStatusMessage("Wait for your opponent's move")
         return
       }
@@ -631,7 +659,10 @@ export default function TicTacToe3D() {
       if (intersects.length > 0) {
         const mesh = intersects[0].object as THREE.Mesh
         const { layer, row, col } = mesh.userData
+        console.log('[DEBUG] Click detected on cell:', { layer, row, col })
         handleCellClickRef.current(layer, row, col)
+      } else {
+        console.log('[DEBUG] No cell intersection found')
       }
     }
 
