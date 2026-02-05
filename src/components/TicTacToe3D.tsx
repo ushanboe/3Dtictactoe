@@ -361,6 +361,9 @@ export default function TicTacToe3D() {
   // Update markers when board changes
   useEffect(() => {
     if (gameState !== 'playing' || !gridGroupRef.current) return
+    
+    // Ensure board is properly initialized
+    if (!board || !board[0] || !board[0][0]) return
 
     const gridGroup = gridGroupRef.current
 
