@@ -286,6 +286,7 @@ export default function TicTacToe3D() {
     )
 
     setBoard(newBoard)
+    boardRef.current = newBoard
 
     // Check for winner
     const result = checkWinner(newBoard)
@@ -757,13 +758,13 @@ export default function TicTacToe3D() {
 
   // Game functions
   const resetBoard = () => {
-    setBoard(
+    const emptyBoard = Array(3).fill(null).map(() =>
       Array(3).fill(null).map(() =>
-        Array(3).fill(null).map(() =>
-          Array(3).fill(null)
-        )
+        Array(3).fill(null)
       )
     )
+    setBoard(emptyBoard)
+    boardRef.current = emptyBoard
     setCurrentPlayer('X')
     currentPlayerRef.current = 'X'
     setWinner(null)
@@ -840,6 +841,7 @@ export default function TicTacToe3D() {
       const data = snapshot.val() as GameData
       if (data) {
         setBoard(data.board)
+        boardRef.current = data.board
         setCurrentPlayer(data.currentPlayer)
         currentPlayerRef.current = data.currentPlayer
         currentPlayerRef.current = data.currentPlayer
@@ -904,6 +906,7 @@ export default function TicTacToe3D() {
       }
 
       setBoard(data.board)
+      boardRef.current = data.board
       setCurrentPlayer(data.currentPlayer)
       currentPlayerRef.current = data.currentPlayer
       setPlayer1Name(data.player1Name)
