@@ -83,7 +83,13 @@ export default function TicTacToe3D() {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const cellMeshesRef = useRef<THREE.Mesh[][][]>([])
-  const markerMeshesRef = useRef<THREE.Group[][][]>([])
+  const markerMeshesRef = useRef<THREE.Group[][][]>(
+    Array(3).fill(null).map(() =>
+      Array(3).fill(null).map(() =>
+        Array(3).fill(null)
+      )
+    )
+  )
   const gridGroupRef = useRef<THREE.Group | null>(null)
   const animationIdRef = useRef<number>(0)
   const handleCellClickRef = useRef<(layer: number, row: number, col: number, isAI?: boolean) => void>(() => {})
@@ -409,14 +415,7 @@ export default function TicTacToe3D() {
       }
     }
 
-    // Initialize marker array if needed
-    if (markerMeshesRef.current.length === 0) {
-      markerMeshesRef.current = Array(3).fill(null).map(() =>
-        Array(3).fill(null).map(() =>
-          Array(3).fill(null)
-        )
-      )
-    }
+    // Marker array is always initialized
 
     // Create new markers
     // Layer spacing: layers are stacked vertically with good separation
@@ -434,14 +433,12 @@ export default function TicTacToe3D() {
             const position = new THREE.Vector3(x, y, z)
             const isWinning = winningLine?.some(([wl, wr, wc]) => wl === layer && wr === row && wc === col) || false
             
-            if (markerMeshesRef.current[layer]?.[row] !== undefined) {
-              if (value === 'X') {
-                markerMeshesRef.current[layer][row][col] = createXMarker(position, isWinning)
-              } else {
-                markerMeshesRef.current[layer][row][col] = createOMarker(position, isWinning)
-              }
-              gridGroup.add(markerMeshesRef.current[layer][row][col])
+            if (value === 'X') {
+              markerMeshesRef.current[layer][row][col] = createXMarker(position, isWinning)
+            } else {
+              markerMeshesRef.current[layer][row][col] = createOMarker(position, isWinning)
             }
+            gridGroup.add(markerMeshesRef.current[layer][row][col])
           }
         }
       }
@@ -576,8 +573,12 @@ export default function TicTacToe3D() {
     }
     cellMeshesRef.current = cells
 
-    // Reset marker meshes
-    markerMeshesRef.current = []
+    // Reset marker meshes - reinitialize as 3D array
+    markerMeshesRef.current = Array(3).fill(null).map(() =>
+      Array(3).fill(null).map(() =>
+        Array(3).fill(null)
+      )
+    )
 
     // Animation loop
     const animate = () => {
