@@ -404,12 +404,14 @@ export default function TicTacToe3D() {
             const position = new THREE.Vector3(x, y, z)
             const isWinning = winningLine?.some(([wl, wr, wc]) => wl === layer && wr === row && wc === col) || false
             
-            if (value === 'X') {
-              markerMeshesRef.current[layer][row][col] = createXMarker(position, isWinning)
-            } else {
-              markerMeshesRef.current[layer][row][col] = createOMarker(position, isWinning)
+            if (markerMeshesRef.current[layer]?.[row] !== undefined) {
+              if (value === 'X') {
+                markerMeshesRef.current[layer][row][col] = createXMarker(position, isWinning)
+              } else {
+                markerMeshesRef.current[layer][row][col] = createOMarker(position, isWinning)
+              }
+              gridGroup.add(markerMeshesRef.current[layer][row][col])
             }
-            gridGroup.add(markerMeshesRef.current[layer][row][col])
           }
         }
       }
