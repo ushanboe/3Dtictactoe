@@ -115,6 +115,7 @@ export default function TicTacToe3D() {
   const waitingForPlayerRef = useRef(false)
   const gameModeRef = useRef<GameMode>('local')
   const playerSymbolRef = useRef<PlayerSymbol>('X')
+  const currentPlayerRef = useRef<PlayerSymbol>('X')
   const [statusMessage, setStatusMessage] = useState('')
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [showingWin, setShowingWin] = useState(false)
@@ -227,7 +228,7 @@ export default function TicTacToe3D() {
 
     // Check if it's player's turn in online mode
     if (gameModeRef.current === 'online' && !isAI) {
-      const isMyTurn = currentPlayer === playerSymbolRef.current
+      const isMyTurn = currentPlayerRef.current === playerSymbolRef.current
       if (!isMyTurn) {
         setStatusMessage("Wait for your opponent's move")
         return
@@ -289,6 +290,7 @@ export default function TicTacToe3D() {
     // Switch player
     const nextPlayer = currentPlayer === 'X' ? 'O' : 'X'
     setCurrentPlayer(nextPlayer)
+    currentPlayerRef.current = nextPlayer
     setStatusMessage(`${nextPlayer === 'X' ? player1Name : player2Name}'s turn`)
 
     // Update online game
@@ -723,6 +725,7 @@ export default function TicTacToe3D() {
       )
     )
     setCurrentPlayer('X')
+    currentPlayerRef.current = 'X'
     setWinner(null)
     setWinningLine(null)
     setShowingWin(false)
@@ -798,6 +801,8 @@ export default function TicTacToe3D() {
       if (data) {
         setBoard(data.board)
         setCurrentPlayer(data.currentPlayer)
+        currentPlayerRef.current = data.currentPlayer
+        currentPlayerRef.current = data.currentPlayer
         setPlayer2Name(data.player2Name || 'Waiting...')
         
         if (data.player2Joined && waitingForPlayerRef.current) {
@@ -860,6 +865,7 @@ export default function TicTacToe3D() {
 
       setBoard(data.board)
       setCurrentPlayer(data.currentPlayer)
+      currentPlayerRef.current = data.currentPlayer
       setPlayer1Name(data.player1Name)
       setPlayer2Name(data.player2Joined ? data.player2Name : onlinePlayerName)
       setGameMode('online')
