@@ -112,6 +112,7 @@ export default function TicTacToe3D() {
   const [joinCode, setJoinCode] = useState('')
   const [onlinePlayerName, setOnlinePlayerName] = useState('')
   const [waitingForPlayer, setWaitingForPlayer] = useState(false)
+  const waitingForPlayerRef = useRef(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [showingWin, setShowingWin] = useState(false)
@@ -758,6 +759,7 @@ export default function TicTacToe3D() {
     setPlayerSymbol('X')
     setPlayer1Name(onlinePlayerName)
     setWaitingForPlayer(true)
+    waitingForPlayerRef.current = true
 
     const gameReference = ref(databaseRef.current, `games/${code}`)
     gameRef.current = gameReference
@@ -786,8 +788,9 @@ export default function TicTacToe3D() {
         setCurrentPlayer(data.currentPlayer)
         setPlayer2Name(data.player2Name || 'Waiting...')
         
-        if (data.player2Joined && waitingForPlayer) {
+        if (data.player2Joined && waitingForPlayerRef.current) {
           setWaitingForPlayer(false)
+          waitingForPlayerRef.current = false
           setGameMode('online')
           setStatusMessage(`${data.currentPlayer === 'X' ? data.player1Name : data.player2Name}'s turn`)
           setGameState('playing')
@@ -893,6 +896,7 @@ export default function TicTacToe3D() {
     resetBoard()
     setGameState('menu')
     setWaitingForPlayer(false)
+    waitingForPlayerRef.current = false
     setGameCode('')
     setJoinCode('')
     setStatusMessage('')
