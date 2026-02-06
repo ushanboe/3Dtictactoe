@@ -961,6 +961,11 @@ export default function TicTacToe3D() {
             setShowingWin(false)
             setGameState('gameover')
           }, 5000)
+        } else {
+          // Reset winner state when playAgain is called
+          setWinner(null)
+          setWinningLine(null)
+          setShowingWin(false)
         }
       }
     })
@@ -1022,6 +1027,11 @@ export default function TicTacToe3D() {
           setShowingWin(false)
           setGameState('gameover')
         }, 5000)
+      } else {
+        // Reset winner state when playAgain is called
+        setWinner(null)
+        setWinningLine(null)
+        setShowingWin(false)
       }
     }, { onlyOnce: false })
   }
