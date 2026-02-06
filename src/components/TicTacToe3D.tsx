@@ -12,8 +12,10 @@ type PlayerSymbol = 'X' | 'O'
 type CellValue = 'X' | 'O' | null
 type GameState = 'menu' | 'playing' | 'gameover'
 
+type SerializedCellValue = 'X' | 'O' | '-'
+
 interface GameData {
-  board: CellValue[][][]
+  board: CellValue[][][] | SerializedCellValue[][][]
   currentPlayer: PlayerSymbol
   player1Name: string
   player2Name: string
@@ -114,6 +116,50 @@ export default function TicTacToe3D() {
   useEffect(() => {
     boardRef.current = board
   }, [board])
+
+  // Helper to serialize board for Firebase (replace null with '-')
+  // Firebase converts arrays with null values to sparse objects
+  const serializeBoardForFirebase = (board: CellValue[][][]) => {
+    return board.map(layer =>
+      layer.map(row =>
+        row.map(cell => cell === null ? '-' : cell)
+      )
+    )
+  }
+
+  // Helper to deserialize board from Firebase (replace '-' with null)
+  const deserializeBoardFromFirebase = (board: unknown): CellValue[][][] => {
+    const emptyBoard = (): CellValue[][][] => 
+      Array(3).fill(null).map(() =>
+        Array(3).fill(null).map(() =>
+          Array(3).fill(null)
+        )
+      )
+
+    if (!board || !Array.isArray(board) || board.length !== 3) {
+      console.log('[DEBUG] Board invalid in deserialize, returning empty. Received:', board)
+      return emptyBoard()
+    }
+
+    return board.map((layer, l) => {
+      if (!layer || !Array.isArray(layer) || layer.length !== 3) {
+        console.log(`[DEBUG] Layer ${l} invalid, creating empty layer`)
+        return Array(3).fill(null).map(() => Array(3).fill(null))
+      }
+      return layer.map((row, r) => {
+        if (!row || !Array.isArray(row) || row.length !== 3) {
+          console.log(`[DEBUG] Row ${l},${r} invalid, creating empty row`)
+          return Array(3).fill(null)
+        }
+        return row.map(cell => {
+          if (cell === '-' || cell === null || cell === undefined) return null
+          if (cell === 'X' || cell === 'O') return cell
+          return null
+        })
+      })
+    }) as CellValue[][][]
+  }
+
   // Helper function to ensure board is always a valid 3D array
   // Firebase can convert arrays with null values to objects or undefined
   const ensureValidBoard = (board: unknown): CellValue[][][] => {
@@ -355,7 +401,7 @@ export default function TicTacToe3D() {
 
       if (gameModeRef.current === 'online' && gameRef.current) {
         set(gameRef.current, {
-          board: newBoard,
+          board: serializeBoardForFirebase(newBoard),
           currentPlayer: currentPlayer === 'X' ? 'O' : 'X',
           player1Name,
           player2Name,
@@ -389,7 +435,7 @@ export default function TicTacToe3D() {
     // Update online game
     if (gameModeRef.current === 'online' && gameRef.current) {
       set(gameRef.current, {
-        board: newBoard,
+        board: serializeBoardForFirebase(newBoard),
         currentPlayer: nextPlayer,
         player1Name,
         player2Name,
@@ -871,11 +917,11 @@ export default function TicTacToe3D() {
     gameRef.current = gameReference
 
     const initialData: GameData = {
-      board: Array(3).fill(null).map(() =>
+      board: serializeBoardForFirebase(Array(3).fill(null).map(() =>
         Array(3).fill(null).map(() =>
           Array(3).fill(null)
         )
-      ),
+      )),
       currentPlayer: 'X',
       player1Name: onlinePlayerName,
       player2Name: '',
@@ -890,7 +936,7 @@ export default function TicTacToe3D() {
     onValue(gameReference, (snapshot) => {
       const data = snapshot.val() as GameData
       if (data) {
-        const validBoard = ensureValidBoard(data.board)
+        const validBoard = deserializeBoardFromFirebase(data.board)
         setBoard(validBoard)
         boardRef.current = validBoard
         setCurrentPlayer(data.currentPlayer)
@@ -956,7 +1002,7 @@ export default function TicTacToe3D() {
         setGameCode(joinCode)
       }
 
-      const validBoard = ensureValidBoard(data.board)
+      const validBoard = deserializeBoardFromFirebase(data.board)
       setBoard(validBoard)
       boardRef.current = validBoard
       setCurrentPlayer(data.currentPlayer)
@@ -987,11 +1033,11 @@ export default function TicTacToe3D() {
 
     if (gameModeRef.current === 'online' && gameRef.current) {
       set(gameRef.current, {
-        board: Array(3).fill(null).map(() =>
+        board: serializeBoardForFirebase(Array(3).fill(null).map(() =>
           Array(3).fill(null).map(() =>
             Array(3).fill(null)
           )
-        ),
+        )),
         currentPlayer: 'X',
         player1Name,
         player2Name,
