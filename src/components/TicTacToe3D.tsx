@@ -114,6 +114,45 @@ export default function TicTacToe3D() {
   useEffect(() => {
     boardRef.current = board
   }, [board])
+  // Helper function to ensure board is always a valid 3D array
+  // Firebase can convert arrays with null values to objects or undefined
+  const ensureValidBoard = (board: unknown): CellValue[][][] => {
+    const emptyBoard = (): CellValue[][][] => 
+      Array(3).fill(null).map(() =>
+        Array(3).fill(null).map(() =>
+          Array(3).fill(null)
+        )
+      )
+
+    if (!board || !Array.isArray(board) || board.length !== 3) {
+      console.log('[DEBUG] Board invalid, returning empty board. Received:', board)
+      return emptyBoard()
+    }
+
+    // Ensure each layer is valid
+    return board.map((layer, l) => {
+      if (!layer || !Array.isArray(layer) || layer.length !== 3) {
+        console.log(`[DEBUG] Layer ${l} invalid, creating empty layer. Received:`, layer)
+        return Array(3).fill(null).map(() => Array(3).fill(null))
+      }
+      // Ensure each row is valid
+      return layer.map((row, r) => {
+        if (!row || !Array.isArray(row) || row.length !== 3) {
+          console.log(`[DEBUG] Row ${l},${r} invalid, creating empty row. Received:`, row)
+          return Array(3).fill(null)
+        }
+        // Ensure each cell is valid (null, 'X', or 'O')
+        return row.map((cell, c) => {
+          if (cell !== null && cell !== 'X' && cell !== 'O') {
+            return null
+          }
+          return cell
+        })
+      })
+    }) as CellValue[][][]
+  }
+
+
   const [currentPlayer, setCurrentPlayer] = useState<PlayerSymbol>('X')
   const [playerSymbol, setPlayerSymbol] = useState<PlayerSymbol>('X')
   const [player1Name, setPlayer1Name] = useState('Player 1')
@@ -851,8 +890,9 @@ export default function TicTacToe3D() {
     onValue(gameReference, (snapshot) => {
       const data = snapshot.val() as GameData
       if (data) {
-        setBoard(data.board)
-        boardRef.current = data.board
+        const validBoard = ensureValidBoard(data.board)
+        setBoard(validBoard)
+        boardRef.current = validBoard
         setCurrentPlayer(data.currentPlayer)
         currentPlayerRef.current = data.currentPlayer
         currentPlayerRef.current = data.currentPlayer
@@ -916,8 +956,9 @@ export default function TicTacToe3D() {
         setGameCode(joinCode)
       }
 
-      setBoard(data.board)
-      boardRef.current = data.board
+      const validBoard = ensureValidBoard(data.board)
+      setBoard(validBoard)
+      boardRef.current = validBoard
       setCurrentPlayer(data.currentPlayer)
       currentPlayerRef.current = data.currentPlayer
       setPlayer1Name(data.player1Name)
