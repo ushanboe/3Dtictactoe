@@ -237,6 +237,17 @@ export default function TicTacToe3D() {
   const handleCellClick = useCallback((layer: number, row: number, col: number, isAI = false) => {
     console.log('[DEBUG] handleCellClick called:', { layer, row, col, isAI })
     const currentBoard = boardRef.current
+    console.log('[DEBUG] Board structure:', {
+      boardRefCurrent: boardRef.current,
+      boardType: typeof boardRef.current,
+      isArray: Array.isArray(boardRef.current),
+      boardLength: boardRef.current?.length,
+      layer0: boardRef.current?.[0],
+      layer0IsArray: Array.isArray(boardRef.current?.[0]),
+      layer0Length: boardRef.current?.[0]?.length,
+      row00: boardRef.current?.[0]?.[0],
+      row00IsArray: Array.isArray(boardRef.current?.[0]?.[0])
+    })
     console.log('[DEBUG] State:', { 
       winner, 
       showingWin, 
