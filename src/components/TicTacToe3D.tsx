@@ -203,6 +203,8 @@ export default function TicTacToe3D() {
   const [playerSymbol, setPlayerSymbol] = useState<PlayerSymbol>('X')
   const [player1Name, setPlayer1Name] = useState('Player 1')
   const [player2Name, setPlayer2Name] = useState('Player 2')
+  const player1NameRef = useRef(player1Name)
+  const player2NameRef = useRef(player2Name)
   const [winner, setWinner] = useState<string | null>(null)
   const [winningLine, setWinningLine] = useState<number[][] | null>(null)
   const [gameCode, setGameCode] = useState('')
@@ -219,6 +221,15 @@ export default function TicTacToe3D() {
 
   const databaseRef = useRef<Database | null>(null)
   const gameRef = useRef<DatabaseReference | null>(null)
+
+  // Keep player name refs in sync with state
+  useEffect(() => {
+    player1NameRef.current = player1Name
+  }, [player1Name])
+
+  useEffect(() => {
+    player2NameRef.current = player2Name
+  }, [player2Name])
 
   const { user, isSubscribed, loading, signIn, signOut, checkout } = useSubscription()
 
@@ -387,7 +398,7 @@ export default function TicTacToe3D() {
     // Check for winner
     const result = checkWinner(newBoard)
     if (result.winner) {
-      const winnerName = result.winner === 'X' ? player1Name : player2Name
+      const winnerName = result.winner === 'X' ? player1NameRef.current : player2NameRef.current
       setWinner(winnerName)
       setWinningLine(result.line)
       setShowingWin(true)
