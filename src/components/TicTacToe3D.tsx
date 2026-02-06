@@ -943,6 +943,10 @@ export default function TicTacToe3D() {
         currentPlayerRef.current = data.currentPlayer
         currentPlayerRef.current = data.currentPlayer
         setPlayer2Name(data.player2Name || 'Waiting...')
+        // Keep player1Name in sync from Firebase data
+        if (data.player1Name) {
+          setPlayer1Name(data.player1Name || 'Player 1')
+        }
         
         if (data.player2Joined && waitingForPlayerRef.current) {
           setWaitingForPlayer(false)
@@ -1012,7 +1016,7 @@ export default function TicTacToe3D() {
       boardRef.current = validBoard
       setCurrentPlayer(data.currentPlayer)
       currentPlayerRef.current = data.currentPlayer
-      setPlayer1Name(data.player1Name)
+      setPlayer1Name(data.player1Name || 'Player 1')
       setPlayer2Name(data.player2Joined ? data.player2Name : onlinePlayerName)
       setGameMode('online')
       gameModeRef.current = 'online'
