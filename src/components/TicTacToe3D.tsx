@@ -79,6 +79,112 @@ const WINNING_LINES = [
   [[0, 2, 2], [1, 1, 1], [2, 0, 0]]
 ]
 
+
+// Sound Manager for classic game sounds
+class SoundManager {
+  private audioContext: AudioContext | null = null
+  private initialized = false
+
+  private getContext(): AudioContext {
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    }
+    return this.audioContext
+  }
+
+  async init() {
+    if (this.initialized) return
+    const ctx = this.getContext()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
+    this.initialized = true
+  }
+
+  // Classic game start sound - ascending arpeggio
+  playGameStart() {
+    const ctx = this.getContext()
+    const now = ctx.currentTime
+    const notes = [261.63, 329.63, 392.00, 523.25] // C4, E4, G4, C5
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'square'
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.15, now + i * 0.1)
+      // Removed invalid exponentialDecayTo call
+      gain.gain.setValueAtTime(0.15, now + i * 0.1)
+      gain.gain.linearRampToValueAtTime(0.01, now + i * 0.1 + 0.15)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + i * 0.1)
+      osc.stop(now + i * 0.1 + 0.15)
+    })
+  }
+
+  // Classic move sound - short blip
+  playMove() {
+    const ctx = this.getContext()
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'square'
+    osc.frequency.setValueAtTime(440, now)
+    osc.frequency.linearRampToValueAtTime(880, now + 0.05)
+    gain.gain.setValueAtTime(0.12, now)
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.08)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.08)
+  }
+
+  // Classic win sound - victory fanfare
+  playWin() {
+    const ctx = this.getContext()
+    const now = ctx.currentTime
+    const melody = [
+      { freq: 523.25, start: 0, dur: 0.15 },     // C5
+      { freq: 659.25, start: 0.15, dur: 0.15 },  // E5
+      { freq: 783.99, start: 0.3, dur: 0.15 },   // G5
+      { freq: 1046.50, start: 0.45, dur: 0.4 },  // C6 (held)
+    ]
+
+    melody.forEach(({ freq, start, dur }) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'square'
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.15, now + start)
+      gain.gain.linearRampToValueAtTime(0.01, now + start + dur)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + start)
+      osc.stop(now + start + dur + 0.05)
+    })
+  }
+
+  // Draw sound - descending tone
+  playDraw() {
+    const ctx = this.getContext()
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'triangle'
+    osc.frequency.setValueAtTime(400, now)
+    osc.frequency.linearRampToValueAtTime(200, now + 0.3)
+    gain.gain.setValueAtTime(0.12, now)
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.3)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.35)
+  }
+}
+
+const soundManager = new SoundManager()
+
 export default function TicTacToe3D() {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -221,6 +327,7 @@ export default function TicTacToe3D() {
 
   const databaseRef = useRef<Database | null>(null)
   const gameRef = useRef<DatabaseReference | null>(null)
+  const winningLineMeshRef = useRef<THREE.Line | null>(null)
 
   // Keep player name refs in sync with state
   useEffect(() => {
@@ -394,6 +501,7 @@ export default function TicTacToe3D() {
 
     setBoard(newBoard)
     boardRef.current = newBoard
+    soundManager.playMove()
 
     // Check for winner
     const result = checkWinner(newBoard)
@@ -403,6 +511,7 @@ export default function TicTacToe3D() {
       setWinningLine(result.line)
       setShowingWin(true)
       setStatusMessage(`${winnerName} wins! 🎉`)
+      soundManager.playWin()
 
       // Delay before showing game over screen
       setTimeout(() => {
@@ -429,6 +538,7 @@ export default function TicTacToe3D() {
     if (checkDraw(newBoard)) {
       setWinner('Draw')
       setShowingWin(true)
+      soundManager.playDraw()
       setStatusMessage("It's a draw!")
       setTimeout(() => {
         setShowingWin(false)
@@ -558,6 +668,64 @@ export default function TicTacToe3D() {
           }
         }
       }
+    }
+
+    // Draw winning line through markers
+    if (winningLine && winningLine.length >= 2 && gridGroupRef.current) {
+      // Remove old winning line if exists
+      if (winningLineMeshRef.current) {
+        gridGroupRef.current.remove(winningLineMeshRef.current)
+        winningLineMeshRef.current = null
+      }
+
+      const layerSpacing = 2.0
+      const cellSpacing = 1.2
+
+      // Get start and end positions of winning line
+      const [startLayer, startRow, startCol] = winningLine[0]
+      const [endLayer, endRow, endCol] = winningLine[winningLine.length - 1]
+
+      const startPos = new THREE.Vector3(
+        (startCol - 1) * cellSpacing,
+        (startLayer - 1) * layerSpacing,
+        (startRow - 1) * cellSpacing
+      )
+      const endPos = new THREE.Vector3(
+        (endCol - 1) * cellSpacing,
+        (endLayer - 1) * layerSpacing,
+        (endRow - 1) * cellSpacing
+      )
+
+      // Extend line slightly beyond markers
+      const direction = endPos.clone().sub(startPos).normalize()
+      const extendedStart = startPos.clone().sub(direction.clone().multiplyScalar(0.3))
+      const extendedEnd = endPos.clone().add(direction.clone().multiplyScalar(0.3))
+
+      // Create line geometry
+      const points = [extendedStart, extendedEnd]
+      const geometry = new THREE.BufferGeometry().setFromPoints(points)
+
+      // Create glowing line material
+      const material = new THREE.LineBasicMaterial({
+        color: 0xffff00,
+        linewidth: 3,
+      })
+
+      const line = new THREE.Line(geometry, material)
+      winningLineMeshRef.current = line
+      gridGroupRef.current.add(line)
+
+      // Also add a thicker tube for better visibility
+      const tubeRadius = 0.08
+      const tubePath = new THREE.LineCurve3(extendedStart, extendedEnd)
+      const tubeGeometry = new THREE.TubeGeometry(tubePath, 1, tubeRadius, 8, false)
+      const tubeMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.8,
+      })
+      const tube = new THREE.Mesh(tubeGeometry, tubeMaterial)
+      gridGroupRef.current.add(tube)
     }
   }, [board, winningLine, gameState, createXMarker, createOMarker])
 
@@ -882,6 +1050,7 @@ export default function TicTacToe3D() {
 
   const startLocalGame = () => {
     resetBoard()
+    soundManager.init().then(() => soundManager.playGameStart())
     setGameMode('local')
     gameModeRef.current = 'local'
     playerSymbolRef.current = 'X'
@@ -964,6 +1133,7 @@ export default function TicTacToe3D() {
           waitingForPlayerRef.current = false
           setGameMode('online')
           gameModeRef.current = 'online'
+          soundManager.init().then(() => soundManager.playGameStart())
           setStatusMessage(`${data.currentPlayer === 'X' ? data.player1Name : data.player2Name}'s turn`)
           setGameState('playing')
         }
@@ -1020,6 +1190,7 @@ export default function TicTacToe3D() {
         setPlayerSymbol('O')
         playerSymbolRef.current = 'O'
         setGameCode(joinCode)
+        soundManager.init().then(() => soundManager.playGameStart())
       }
 
       const validBoard = deserializeBoardFromFirebase(data.board)
