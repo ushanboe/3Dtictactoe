@@ -186,6 +186,9 @@ class SoundManager {
 const soundManager = new SoundManager()
 
 export default function TicTacToe3D() {
+  // Feature flags - set to true to enable premium features
+  const ENABLE_ONLINE_FEATURES = false  // Set to true to show online multiplayer and auth
+
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -1271,7 +1274,8 @@ export default function TicTacToe3D() {
         </h1>
         <p className="text-gray-400 mb-8">Play in three dimensions!</p>
 
-        {/* Auth Section */}
+        {/* Auth Section - Hidden when ENABLE_ONLINE_FEATURES is false */}
+        {ENABLE_ONLINE_FEATURES && (
         <div className="mb-6">
           {loading ? (
             <p className="text-gray-400">Loading...</p>
@@ -1297,6 +1301,7 @@ export default function TicTacToe3D() {
             </button>
           )}
         </div>
+        )}
 
         <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md border border-white/10 shadow-2xl">
           {/* Single Player Section */}
@@ -1331,6 +1336,8 @@ export default function TicTacToe3D() {
             </div>
           </div>
 
+{ENABLE_ONLINE_FEATURES && (
+          <>
           {/* Multiplayer Section */}
           <div className="mb-6">
             <h3 className="text-sm uppercase tracking-widest text-gray-500 mb-4">
@@ -1393,7 +1400,10 @@ export default function TicTacToe3D() {
             )}
           </div>
 
-          {statusMessage && (
+          </>
+        )}
+
+                    {statusMessage && (
             <p className="text-center text-yellow-400 mt-4">{statusMessage}</p>
           )}
 
