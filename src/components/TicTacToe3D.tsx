@@ -315,6 +315,7 @@ export default function TicTacToe3D() {
   const player1NameRef = useRef(player1Name)
   const player2NameRef = useRef(player2Name)
   const [winner, setWinner] = useState<string | null>(null)
+  const [scores, setScores] = useState({ player1: 0, player2: 0, draws: 0 })
   const [winningLine, setWinningLine] = useState<number[][] | null>(null)
   const [gameCode, setGameCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
@@ -515,6 +516,12 @@ export default function TicTacToe3D() {
       setShowingWin(true)
       setStatusMessage(`${winnerName} wins! 🎉`)
       soundManager.playWin()
+      // Update scores
+      setScores(prev => ({
+        ...prev,
+        player1: result.winner === 'X' ? prev.player1 + 1 : prev.player1,
+        player2: result.winner === 'O' ? prev.player2 + 1 : prev.player2
+      }))
 
       // Delay before showing game over screen
       setTimeout(() => {
@@ -542,6 +549,8 @@ export default function TicTacToe3D() {
       setWinner('Draw')
       setShowingWin(true)
       soundManager.playDraw()
+      // Update draw count
+      setScores(prev => ({ ...prev, draws: prev.draws + 1 }))
       setStatusMessage("It's a draw!")
       setTimeout(() => {
         setShowingWin(false)
@@ -1255,6 +1264,7 @@ export default function TicTacToe3D() {
       gameRef.current = null
     }
     resetBoard()
+    setScores({ player1: 0, player2: 0, draws: 0 })  // Reset scores
     setGameState('menu')
     setWaitingForPlayer(false)
     waitingForPlayerRef.current = false
@@ -1487,6 +1497,24 @@ export default function TicTacToe3D() {
         }`}>
           <span className="text-[#f093fb] font-bold text-xl">○</span>
           <span className="ml-2">{player2Name}</span>
+        </div>
+      </div>
+
+      {/* Scoreboard */}
+      <div className="flex justify-center gap-4 px-4 mb-2">
+        <div className="flex items-center gap-6 bg-white/5 backdrop-blur-sm rounded-xl px-6 py-2 border border-white/10">
+          <div className="text-center">
+            <span className="text-[#667eea] font-bold text-lg">{scores.player1}</span>
+            <p className="text-xs text-gray-400">✕ Wins</p>
+          </div>
+          <div className="text-center border-x border-white/10 px-6">
+            <span className="text-gray-400 font-bold text-lg">{scores.draws}</span>
+            <p className="text-xs text-gray-400">Draws</p>
+          </div>
+          <div className="text-center">
+            <span className="text-[#f093fb] font-bold text-lg">{scores.player2}</span>
+            <p className="text-xs text-gray-400">○ Wins</p>
+          </div>
         </div>
       </div>
 
